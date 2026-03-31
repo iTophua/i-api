@@ -1,0 +1,132 @@
+<script setup lang="ts">
+import { NDataTable, NButton, NIcon, NInput, NCheckbox } from 'naive-ui'
+import { AddOutline, TrashOutline } from '@vicons/ionicons5'
+import { h } from 'vue'
+import type { DataTableColumns } from 'naive-ui'
+import type { KeyValuePair } from '@/types'
+
+const props = defineProps<{
+  params: KeyValuePair[]
+}>()
+
+const emit = defineEmits<{
+  'update:params': [params: KeyValuePair[]]
+}>()
+
+function updateField(index: number, field: keyof KeyValuePair, value: string | boolean) {
+  const newData = [...props.params]
+  newData[index] = { ...newData[index], [field]: value }
+  emit('update:params', newData)
+}
+
+function addRow() {
+  emit('update:params', [...props.params, { key: '', value: '', description: '', enabled: true }])
+}
+
+function deleteRow(index: number) {
+  const newData = [...props.params]
+  newData.splice(index, 1)
+  emit('update:params', newData)
+}
+
+const columns: DataTableColumns<KeyValuePair> = [
+  {
+    key: 'enabled',
+    width: 50,
+    align: 'center',
+    render: (row, index) =>
+      h(NCheckbox, {
+        checked: row.enabled,
+        onUpdateChecked: (checked: boolean) => updateField(index, 'enabled', checked),
+      }),
+  },
+  {
+    title: 'Key',
+    key: 'key',
+    render: (row, index) =>
+      h(NInput, {
+        value: row.key,
+        placeholder: '参数名',
+        size: 'small',
+        onUpdateValue: (val: string) => updateField(index, 'key', val),
+      }),
+  },
+  {
+    title: 'Value',
+    key: 'value',
+    render: (row, index) =>
+      h(NInput, {
+        value: row.value,
+        placeholder: '参数值',
+        size: 'small',
+        onUpdateValue: (val: string) => updateField(index, 'value', val),
+      }),
+  },
+  {
+    title: '描述',
+    key: 'description',
+    render: (row, index) =>
+      h(NInput, {
+        value: row.description || '',
+        placeholder: '描述（可选）',
+        size: 'small',
+        onUpdateValue: (val: string) => updateField(index, 'description', val),
+      }),
+  },
+  {
+    key: 'actions',
+    width: 60,
+    render: (_, index) =>
+      h(
+        NButton,
+        { text: true, type: 'error', onClick: () => deleteRow(index) },
+        { icon: () => h(NIcon, null, { default: () => h(TrashOutline) }) }
+      ),
+  },
+]
+</script>
+
+<template>
+  <div class="params-editor">
+    <NDataTable :columns="columns" :data="params" :bordered="false" size="small" />
+    <div class="add-row" @click="addRow">
+      <NButton text type="primary" size="small">
+        <template #icon>
+          <NIcon :component="AddOutline" />
+        </template>
+        添加参数
+      </NButton>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.params-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.params-editor :deep(.n-data-table) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.params-editor :deep(.n-data-table-wrapper) {
+  height: 100%;
+  overflow: auto;
+}
+
+.add-row {
+  padding: 8px 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.add-row:hover {
+  background-color: var(--n-color-hover);
+}
+</style>

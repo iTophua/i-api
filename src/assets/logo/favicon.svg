@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="faviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7C3AED"/>
+      <stop offset="100%" style="stop-color:#A855F7"/>
+    </linearGradient>
+    <linearGradient id="boltGradientFav" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FCD34D"/>
+      <stop offset="100%" style="stop-color:#F59E0B"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="0" y="0" width="32" height="32" rx="7" fill="url(#faviconGradient)"/>
+  
+  <!-- Letter "i" dot -->
+  <circle cx="16" cy="8" r="3" fill="white"/>
+  
+  <!-- Letter "i" stem combined with lightning bolt -->
+  <path d="M14 13 L18 13 L16.5 22 L19 22 L13 30 L15.5 23 L12 23 Z" fill="url(#boltGradientFav)"/>
+</svg>

@@ -1,0 +1,113 @@
+<script setup lang="ts">
+import { NModal, NCard, NSelect, NButton, NSpace } from 'naive-ui'
+import { ref, computed, shallowRef, onMounted } from 'vue'
+import type { Request } from '@/types'
+import { generateCode, type CodeLanguage } from '@/utils/codeGenerator'
+
+const MonacoEditor = shallowRef<any>(null)
+
+onMounted(async () => {
+  const mod = await import('@/components/common/MonacoEditor.vue')
+  MonacoEditor.value = mod.default
+})
+
+const props = defineProps<{
+  show: boolean
+  request: Request | null
+}>()
+
+const emit = defineEmits<{
+  'update:show': [show: boolean]
+}>()
+
+const languageOptions = [
+  { label: 'cURL', value: 'curl' },
+  { label: 'JavaScript (Axios)', value: 'javascript-axios' },
+  { label: 'JavaScript (Fetch)', value: 'javascript-fetch' },
+  { label: 'Python (requests)', value: 'python' },
+  { label: 'Java (OkHttp)', value: 'java' },
+  { label: 'Go', value: 'go' },
+]
+
+const selectedLanguage = ref<CodeLanguage>('curl')
+
+const code = computed(() => {
+  if (!props.request) return ''
+  return generateCode(props.request, selectedLanguage.value)
+})
+
+const editorLanguage = computed(() => {
+  const langMap: Record<CodeLanguage, string> = {
+    curl: 'plaintext',
+    'javascript-axios': 'javascript',
+    'javascript-fetch': 'javascript',
+    python: 'python',
+    java: 'java',
+    go: 'go',
+  }
+  return langMap[selectedLanguage.value] || 'plaintext'
+})
+
+function copyCode() {
+  if (code.value) {
+    navigator.clipboard.writeText(code.value)
+  }
+}
+
+function handleClose() {
+  emit('update:show', false)
+}
+</script>
+
+<template>
+  <NModal :show="props.show" @update:show="emit('update:show', $event)">
+    <NCard style="width: 700px" title="生成代码" :bordered="false" size="medium">
+      <div class="code-generator">
+        <div class="language-selector">
+          <NSelect
+            v-model:value="selectedLanguage"
+            :options="languageOptions"
+            style="width: 200px"
+          />
+          <NButton @click="copyCode">复制代码</NButton>
+        </div>
+
+        <div class="code-preview">
+          <MonacoEditor
+            v-if="MonacoEditor"
+            :model-value="code"
+            :language="editorLanguage"
+            read-only
+            height="400px"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <NSpace justify="end">
+          <NButton @click="handleClose">关闭</NButton>
+        </NSpace>
+      </template>
+    </NCard>
+  </NModal>
+</template>
+
+<style scoped>
+.code-generator {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.language-selector {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.code-preview {
+  border: 1px solid var(--n-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+</style>
