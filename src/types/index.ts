@@ -158,6 +158,16 @@ export interface RequestTab {
   isDirty: boolean
   isTemporary: boolean
   collectionId?: string
+  testResults?: {
+    total: number
+    passed: number
+    failed: number
+    assertions: Array<{
+      name: string
+      passed: boolean
+      message?: string
+    }>
+  }
 }
 
 export interface AppState {
@@ -222,6 +232,27 @@ export function normalizeAuthConfig(auth: any): AuthConfig {
   }
 }
 
+/**
+ * 安全地解析日期时间字符串，处理空值、null 或无效格式
+ * @param dateStr 日期字符串（可能为空、null 或无效格式）
+ * @returns 有效的 ISO 日期字符串
+ */
+export function safeParseDate(dateStr: string | null | undefined, defaultDate?: string): string {
+  if (!dateStr || dateStr.trim() === '') {
+    return defaultDate || new Date().toISOString()
+  }
+  
+  // 尝试解析日期
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) {
+    // 如果解析失败，返回默认值
+    return defaultDate || new Date().toISOString()
+  }
+  
+  // 返回标准化的 ISO 格式
+  return date.toISOString()
+}
+
 export function normalizeRequest(request: any): Request {
   return {
     id: request.id || crypto.randomUUID(),
@@ -235,8 +266,8 @@ export function normalizeRequest(request: any): Request {
     auth: normalizeAuthConfig(request.auth),
     preScript: request.preScript || request.pre_script,
     postScript: request.postScript || request.post_script,
-    createdAt: request.createdAt || request.created_at || new Date().toISOString(),
-    updatedAt: request.updatedAt || request.updated_at || new Date().toISOString(),
+    createdAt: safeParseDate(request.createdAt || request.created_at),
+    updatedAt: safeParseDate(request.updatedAt || request.updated_at),
   }
 }
 

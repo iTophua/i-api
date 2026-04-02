@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::Arc;
+use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScriptContext {
-    pub variables: std::collections::HashMap<String, String>,
+    pub variables: HashMap<String, String>,
     pub test_results: Vec<TestResult>,
 }
 
@@ -12,21 +15,51 @@ pub struct TestResult {
     pub name: String,
     pub passed: bool,
     pub error: Option<String>,
+    pub duration_ms: Option<u64>,
 }
 
 impl Default for ScriptContext {
     fn default() -> Self {
         Self {
-            variables: std::collections::HashMap::new(),
+            variables: HashMap::new(),
             test_results: Vec::new(),
         }
     }
 }
 
+/// 脚本编译缓存
+static SCRIPT_CACHE: Lazy<Arc<dashmap::DashMap<String, CompiledScript>>> = 
+    Lazy::new(|| Arc::new(dashmap::DashMap::new()));
+
+#[derive(Clone)]
+struct CompiledScript {
+    source: String,
+    tokens: Vec<Token>,
+}
+
+#[derive(Clone, Debug)]
+enum Token {
+    VariableSet { key: String, value: String },
+    EnvironmentSet { key: String, value: String },
+    Test { name: String, assertion: Assertion },
+    RequestUrl { url: String },
+    RequestMethod { method: String },
+}
+
+#[derive(Clone, Debug)]
+enum Assertion {
+    StatusEquals(u16),
+    StatusBelow(u64),
+    StatusAbove(u64),
+    HasBody,
+    HasHeader(String),
+    JsonPath { path: String, expected: String },
+}
+
 pub fn execute_pre_request_script(
     script: &str,
     request: &mut crate::models::HttpRequest,
-    environment: &std::collections::HashMap<String, String>,
+    environment: &HashMap<String, String>,
 ) -> Result<ScriptContext, String> {
     let mut context = ScriptContext::default();
 
@@ -34,44 +67,26 @@ pub fn execute_pre_request_script(
         return Ok(context);
     }
 
+    // 尝试从缓存获取编译后的脚本
+    let compiled = compile_script(script);
+    
+    // 环境变量替换
     let mut processed_script = script.to_string();
-
     for (key, value) in environment {
         processed_script = processed_script.replace(&format!("{{{{{}}}}}", key), value);
     }
 
-    if processed_script.contains("pm.request.url") {
-        if let Some(url_start) = processed_script.find("pm.request.url = ") {
-            let start = url_start + "pm.request.url = ".len();
-            if let Some(end) = processed_script[start..].find(';') {
-                let url_value = processed_script[start..start + end].trim();
-                let url = url_value.trim_matches('"').trim_matches('\'');
-                request.url = url.to_string();
-            }
-        }
-    }
-
-    if processed_script.contains("pm.request.method") {
-        if let Some(method_start) = processed_script.find("pm.request.method = ") {
-            let start = method_start + "pm.request.method = ".len();
-            if let Some(end) = processed_script[start..].find(';') {
-                let method_value = processed_script[start..start + end].trim();
-                let method = method_value.trim_matches('"').trim_matches('\'');
-                request.method = method.to_uppercase();
-            }
-        }
-    }
-
-    extract_variables(&processed_script, &mut context);
+    // 执行预请求脚本
+    execute_tokens(&compiled.tokens, request, None, &mut context);
 
     Ok(context)
 }
 
 pub fn execute_post_request_script(
     script: &str,
-    _request: &crate::models::HttpRequest,
+    request: &crate::models::HttpRequest,
     response: &crate::models::HttpResponse,
-    environment: &std::collections::HashMap<String, String>,
+    environment: &HashMap<String, String>,
 ) -> Result<ScriptContext, String> {
     let mut context = ScriptContext::default();
 
@@ -79,50 +94,90 @@ pub fn execute_post_request_script(
         return Ok(context);
     }
 
+    // 环境变量替换
     let mut processed_script = script.to_string();
-
     for (key, value) in environment {
         processed_script = processed_script.replace(&format!("{{{{{}}}}}", key), value);
     }
 
-    if processed_script.contains("pm.test(") {
-        parse_tests(&processed_script, response, &mut context);
-    }
-
-    if processed_script.contains("pm.environment.set(") {
-        extract_environment_sets(&processed_script, &mut context);
-    }
-
-    extract_variables(&processed_script, &mut context);
+    // 编译并执行脚本
+    let compiled = compile_script(&processed_script);
+    execute_tokens(&compiled.tokens, std::ptr::null_mut(), Some(response), &mut context);
 
     Ok(context)
 }
 
-fn parse_tests(script: &str, response: &crate::models::HttpResponse, context: &mut ScriptContext) {
-    let test_pattern = "pm.test(";
-    let mut pos = 0;
+/// 编译脚本（带缓存）
+fn compile_script(source: &str) -> CompiledScript {
+    let cache_key = format!("{:x}", md5::compute(source.as_bytes()));
+    
+    if let Some(cached) = SCRIPT_CACHE.get(&cache_key) {
+        return cached.clone();
+    }
 
+    let tokens = parse_script(source);
+    let compiled = CompiledScript {
+        source: source.to_string(),
+        tokens,
+    };
+
+    SCRIPT_CACHE.insert(cache_key, compiled.clone());
+    compiled
+}
+
+/// 解析脚本为 token 流
+fn parse_script(script: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+
+    // 解析 pm.variables.set - 支持值中包含逗号的情况
+    let var_pattern = "pm.variables.set(";
+    let mut pos = 0;
+    while let Some(start) = script[pos..].find(var_pattern) {
+        let set_start = pos + start + var_pattern.len();
+        // 查找匹配的括号，处理嵌套和引号
+        if let Some(args_end) = find_matching_paren(&script[set_start..]) {
+            let args = &script[set_start..set_start + args_end];
+            // 使用更智能的方式分割参数，考虑引号内的内容
+            if let Some((key, value)) = parse_function_args(args) {
+                tokens.push(Token::VariableSet { key, value });
+            }
+            pos = set_start + args_end + 1;
+        } else {
+            break;
+        }
+    }
+
+    // 解析 pm.environment.set
+    let env_pattern = "pm.environment.set(";
+    pos = 0;
+    while let Some(start) = script[pos..].find(env_pattern) {
+        let set_start = pos + start + env_pattern.len();
+        if let Some(args_end) = find_matching_paren(&script[set_start..]) {
+            let args = &script[set_start..set_start + args_end];
+            if let Some((key, value)) = parse_function_args(args) {
+                tokens.push(Token::EnvironmentSet { key, value });
+            }
+            pos = set_start + args_end + 1;
+        } else {
+            break;
+        }
+    }
+
+    // 解析 pm.test
+    let test_pattern = "pm.test(";
+    pos = 0;
     while let Some(start) = script[pos..].find(test_pattern) {
         let test_start = pos + start + test_pattern.len();
-
-        if let Some(name_end) = script[test_start..].find(',') {
+        if let Some(name_end) = find_closing_quote_and_comma(&script[test_start..]) {
             let name = script[test_start..test_start + name_end]
                 .trim()
                 .trim_matches('"')
-                .trim_matches('\'');
-
-            let passed = check_test_condition(&script[test_start + name_end..], response);
-
-            context.test_results.push(TestResult {
-                name: name.to_string(),
-                passed,
-                error: if passed {
-                    None
-                } else {
-                    Some("断言失败".to_string())
-                },
-            });
-
+                .trim_matches('\'')
+                .to_string();
+            
+            let assertion = parse_assertion(&script[test_start + name_end..]);
+            tokens.push(Token::Test { name, assertion });
+            
             pos = test_start + name_end;
             if let Some(func_end) = script[pos..].find("});") {
                 pos += func_end + 3;
@@ -133,80 +188,261 @@ fn parse_tests(script: &str, response: &crate::models::HttpResponse, context: &m
             break;
         }
     }
+
+    // 解析 pm.request.url
+    if let Some(url_start) = script.find("pm.request.url = ") {
+        let start = url_start + "pm.request.url = ".len();
+        if let Some(end) = script[start..].find(';') {
+            let url = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_string();
+            tokens.push(Token::RequestUrl { url });
+        }
+    }
+
+    // 解析 pm.request.method
+    if let Some(method_start) = script.find("pm.request.method = ") {
+        let start = method_start + "pm.request.method = ".len();
+        if let Some(end) = script[start..].find(';') {
+            let method = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_uppercase();
+            tokens.push(Token::RequestMethod { method });
+        }
+    }
+
+    tokens
 }
 
-fn check_test_condition(script: &str, response: &crate::models::HttpResponse) -> bool {
-    if script.contains("pm.response.status") || script.contains("pm.response.code") {
-        if script.contains(&format!("{}.equals(", response.status))
-            || script.contains(&format!("== {}", response.status))
-            || script.contains(&format!("=== {}", response.status))
-        {
-            return true;
+/// 查找匹配的右括号
+fn find_matching_paren(s: &str) -> Option<usize> {
+    let mut depth = 1;
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut escape_next = false;
+    
+    for (i, ch) in s.chars().enumerate() {
+        if escape_next {
+            escape_next = false;
+            continue;
         }
-
-        if script.contains("to.equal(200)") && response.status == 200 {
-            return true;
+        
+        if ch == '\\' && (in_single_quote || in_double_quote) {
+            escape_next = true;
+            continue;
         }
+        
+        if !in_single_quote && !in_double_quote {
+            if ch == '"' {
+                in_double_quote = true;
+            } else if ch == '\'' {
+                in_single_quote = true;
+            } else if ch == '(' {
+                depth += 1;
+            } else if ch == ')' {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+        } else if in_single_quote && ch == '\'' {
+            in_single_quote = false;
+        } else if in_double_quote && ch == '"' {
+            in_double_quote = false;
+        }
+    }
+    
+    None
+}
 
-        if script.contains("to.be.below(") {
-            if let Some(below_start) = script.find("to.be.below(") {
-                let start = below_start + "to.be.below(".len();
-                if let Some(end) = script[start..].find(')') {
-                    if let Ok(threshold) = script[start..start + end].parse::<u64>() {
-                        return response.response_time < threshold;
-                    }
+/// 解析函数参数，返回 (key, value)
+fn parse_function_args(args: &str) -> Option<(String, String)> {
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut escape_next = false;
+    let mut comma_pos = None;
+    
+    // 找到第一个不在引号内的逗号
+    for (i, ch) in args.chars().enumerate() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        
+        if ch == '\\' && (in_single_quote || in_double_quote) {
+            escape_next = true;
+            continue;
+        }
+        
+        if !in_single_quote && !in_double_quote {
+            if ch == '"' {
+                in_double_quote = true;
+            } else if ch == '\'' {
+                in_single_quote = true;
+            } else if ch == ',' {
+                comma_pos = Some(i);
+                break;
+            }
+        } else if in_single_quote && ch == '\'' {
+            in_single_quote = false;
+        } else if in_double_quote && ch == '"' {
+            in_double_quote = false;
+        }
+    }
+    
+    let comma_pos = comma_pos?;
+    let key = args[..comma_pos].trim().trim_matches('"').trim_matches('\'').to_string();
+    let value = args[comma_pos + 1..].trim().trim_matches('"').trim_matches('\'').to_string();
+    
+    Some((key, value))
+}
+
+/// 查找闭合引号和逗号的位置
+fn find_closing_quote_and_comma(s: &str) -> Option<usize> {
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut escape_next = false;
+    
+    for (i, ch) in s.chars().enumerate() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        
+        if ch == '\\' && (in_single_quote || in_double_quote) {
+            escape_next = true;
+            continue;
+        }
+        
+        if !in_single_quote && !in_double_quote {
+            if ch == '"' {
+                in_double_quote = true;
+            } else if ch == '\'' {
+                in_single_quote = true;
+            }
+        } else if in_single_quote && ch == '\'' {
+            in_single_quote = false;
+        } else if in_double_quote && ch == '"' {
+            in_double_quote = false;
+        } else if (in_single_quote || in_double_quote) && ch == ',' {
+            // 在引号内的逗号，继续
+            continue;
+        }
+        
+        // 如果刚关闭引号且下一个字符是逗号
+        if !in_single_quote && !in_double_quote && i + 1 < s.len() && s[i + 1..].starts_with(',') {
+            return Some(i + 1);
+        }
+    }
+    
+    None
+}
+
+/// 解析断言
+fn parse_assertion(script: &str) -> Assertion {
+    if script.contains("to.equal(") || script.contains(".equals(") {
+        if let Some(eq_start) = script.find("to.equal(").or_else(|| script.find(".equals(")) {
+            let start = eq_start + "to.equal(".len();
+            if let Some(end) = script[start..].find(')') {
+                if let Ok(status) = script[start..start + end].parse::<u16>() {
+                    return Assertion::StatusEquals(status);
                 }
             }
         }
     }
 
-    true
+    if script.contains("to.be.below(") {
+        if let Some(below_start) = script.find("to.be.below(") {
+            let start = below_start + "to.be.below(".len();
+            if let Some(end) = script[start..].find(')') {
+                if let Ok(threshold) = script[start..start + end].parse::<u64>() {
+                    return Assertion::StatusBelow(threshold);
+                }
+            }
+        }
+    }
+
+    if script.contains("to.be.above(") {
+        if let Some(above_start) = script.find("to.be.above(") {
+            let start = above_start + "to.be.above(".len();
+            if let Some(end) = script[start..].find(')') {
+                if let Ok(threshold) = script[start..start + end].parse::<u64>() {
+                    return Assertion::StatusAbove(threshold);
+                }
+            }
+        }
+    }
+
+    if script.contains("to.have.body()") {
+        return Assertion::HasBody;
+    }
+
+    if script.contains("pm.response.to.have.header(") {
+        if let Some(header_start) = script.find("pm.response.to.have.header(") {
+            let start = header_start + "pm.response.to.have.header(".len();
+            if let Some(end) = script[start..].find(')') {
+                let header = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_string();
+                return Assertion::HasHeader(header);
+            }
+        }
+    }
+
+    Assertion::StatusEquals(200) // 默认断言
 }
 
-fn extract_environment_sets(script: &str, context: &mut ScriptContext) {
-    let set_pattern = "pm.environment.set(";
-    let mut pos = 0;
+/// 执行 token
+fn execute_tokens(
+    tokens: &[Token],
+    request: *mut crate::models::HttpRequest,
+    response: Option<&crate::models::HttpResponse>,
+    context: &mut ScriptContext,
+) {
+    let mut request_ref = if request.is_null() { None } else { Some(unsafe { &mut *request }) };
 
-    while let Some(start) = script[pos..].find(set_pattern) {
-        let set_start = pos + start + set_pattern.len();
-
-        if let Some(args_end) = script[set_start..].find(')') {
-            let args = &script[set_start..set_start + args_end];
-            let parts: Vec<&str> = args.split(',').collect();
-
-            if parts.len() == 2 {
-                let key = parts[0].trim().trim_matches('"').trim_matches('\'');
-                let value = parts[1].trim().trim_matches('"').trim_matches('\'');
-                context.variables.insert(key.to_string(), value.to_string());
+    for token in tokens {
+        match token {
+            Token::VariableSet { key, value } => {
+                context.variables.insert(key.clone(), value.clone());
             }
-
-            pos = set_start + args_end + 1;
-        } else {
-            break;
+            Token::EnvironmentSet { key, value } => {
+                context.variables.insert(key.clone(), value.clone());
+            }
+            Token::Test { name, assertion } => {
+                let start = std::time::Instant::now();
+                let passed = evaluate_assertion(assertion, response);
+                let duration = start.elapsed().as_millis() as u64;
+                
+                context.test_results.push(TestResult {
+                    name: name.clone(),
+                    passed,
+                    error: if passed { None } else { Some("断言失败".to_string()) },
+                    duration_ms: Some(duration),
+                });
+            }
+            Token::RequestUrl { url } => {
+                if let Some(req) = &mut request_ref {
+                    req.url = url.clone();
+                }
+            }
+            Token::RequestMethod { method } => {
+                if let Some(req) = &mut request_ref {
+                    req.method = method.clone();
+                }
+            }
         }
     }
 }
 
-fn extract_variables(script: &str, context: &mut ScriptContext) {
-    let var_pattern = "pm.variables.set(";
-    let mut pos = 0;
+/// 评估断言
+fn evaluate_assertion(assertion: &Assertion, response: Option<&crate::models::HttpResponse>) -> bool {
+    let Some(response) = response else {
+        return false;
+    };
 
-    while let Some(start) = script[pos..].find(var_pattern) {
-        let set_start = pos + start + var_pattern.len();
-
-        if let Some(args_end) = script[set_start..].find(')') {
-            let args = &script[set_start..set_start + args_end];
-            let parts: Vec<&str> = args.split(',').collect();
-
-            if parts.len() == 2 {
-                let key = parts[0].trim().trim_matches('"').trim_matches('\'');
-                let value = parts[1].trim().trim_matches('"').trim_matches('\'');
-                context.variables.insert(key.to_string(), value.to_string());
-            }
-
-            pos = set_start + args_end + 1;
-        } else {
-            break;
+    match assertion {
+        Assertion::StatusEquals(expected) => response.status == *expected,
+        Assertion::StatusBelow(threshold) => response.response_time < *threshold,
+        Assertion::StatusAbove(threshold) => response.response_time > *threshold,
+        Assertion::HasBody => !response.body.is_empty(),
+        Assertion::HasHeader(header) => response.headers.contains_key(header),
+        Assertion::JsonPath { path, expected } => {
+            extract_json_value(&response.body, path).map_or(false, |v| &v == expected)
         }
     }
 }

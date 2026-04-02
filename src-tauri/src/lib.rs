@@ -9,11 +9,11 @@ mod secure_storage;
 
 use database::Database;
 use error::IApiError;
-use models::{AppState, Collection, HttpRequest, HttpResponse, History, Environment, Folder};
+use models::{AppState, Collection, HttpRequest, HttpResponse, History, Environment};
 use script::{ScriptContext, execute_pre_request_script, execute_post_request_script};
 use secure_storage::SecureStorage;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -36,6 +36,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             send_http_request,
+            send_http_request_stream,
             cancel_http_request,
             save_request,
             get_all_requests,
@@ -66,6 +67,7 @@ pub fn run() {
             get_requests_by_collection,
             rename_request,
             delete_request_from_collection,
+            batch_delete_requests,
             save_open_tabs,
             get_open_tabs,
         ])
@@ -74,7 +76,11 @@ pub fn run() {
 }
 
 #[tauri::command]
-async fn send_http_request(request: HttpRequest, history_limit: Option<i64>, db: tauri::State<'_, Arc<Database>>) -> Result<HttpResponse, String> {
+async fn send_http_request(
+    request: HttpRequest,
+    history_limit: Option<i64>,
+    db: tauri::State<'_, Arc<Database>>,
+) -> Result<HttpResponse, String> {
     let response = http::send_request(request.clone()).await?;
 
     let history = History::new(
@@ -85,9 +91,86 @@ async fn send_http_request(request: HttpRequest, history_limit: Option<i64>, db:
         response.response_size as usize,
     );
     let limit = history_limit.unwrap_or(100);
-    db.add_history(&history, limit).map_err(|e| e.to_string())?;
+    let _ = db.repository.add_history(&history, limit);
 
     Ok(response)
+}
+
+#[tauri::command]
+async fn send_http_request_stream(
+    request: HttpRequest,
+    window: tauri::Window,
+    event_id: String,
+    history_limit: Option<i64>,
+    db: tauri::State<'_, Arc<Database>>
+) -> Result<(), String> {
+    let start = std::time::Instant::now();
+    let request_clone = request.clone();
+    let window_clone = window.clone();
+    let event_id_clone = event_id.clone();
+    
+    // 发送响应头事件
+    let _ = window.emit(
+        &format!("{}-headers", event_id),
+        serde_json::json!({
+            "status": "started",
+            "timestamp": start.elapsed().as_millis() as u64
+        })
+    );
+    
+    match http::send_request_stream(request, move |chunk, headers, status, elapsed| {
+        let win = window_clone.clone();
+        let eid = event_id_clone.clone();
+        
+        // 发送响应块事件（同步）
+        let _ = win.emit(
+            &format!("{}-chunk", eid),
+            serde_json::json!({
+                "chunk": chunk,
+                "headers": headers,
+                "status": status,
+                "responseTime": elapsed.elapsed().as_millis() as u64,
+                "isFinal": false
+            })
+        );
+    }).await {
+        Ok((full_body, headers, status, response_time, response_size)) => {
+            // 发送完成事件
+            let _ = window.emit(
+                &format!("{}-complete", event_id),
+                serde_json::json!({
+                    "body": full_body,
+                    "headers": headers,
+                    "status": status,
+                    "responseTime": response_time,
+                    "responseSize": response_size,
+                    "isFinal": true
+                })
+            );
+            
+            // 保存历史
+            let history = History::new(
+                request_clone.method,
+                request_clone.url,
+                status,
+                response_time,
+                response_size,
+            );
+            let limit = history_limit.unwrap_or(100);
+            let _ = db.repository.add_history(&history, limit);
+        }
+        Err(e) => {
+            let _ = window.emit(
+                &format!("{}-error", event_id),
+                serde_json::json!({
+                    "error": e,
+                    "isFinal": true
+                })
+            );
+        }
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -97,22 +180,22 @@ async fn cancel_http_request(request_id: String) -> Result<bool, String> {
 
 #[tauri::command]
 fn save_request(request: HttpRequest, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.save_request(&request).map_err(|e| e.to_string())
+    db.repository.save_request(&request).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_all_requests(db: tauri::State<'_, Arc<Database>>) -> Result<Vec<HttpRequest>, String> {
-    db.get_all_requests().map_err(|e| e.to_string())
+    db.repository.get_all_requests().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn delete_request(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.delete_request(&id).map_err(|e| e.to_string())
+    db.repository.delete_request(&id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_recent_history(limit: usize, db: tauri::State<'_, Arc<Database>>) -> Result<Vec<History>, String> {
-    db.get_recent_history(limit).map_err(|e| e.to_string())
+    db.repository.get_recent_history(limit as i64).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -261,42 +344,64 @@ fn import_har(content: String) -> Result<Vec<HttpRequest>, String> {
 
 #[tauri::command]
 fn save_temporary_request(request: HttpRequest, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.save_temporary_request(&request).map_err(|e| e.to_string())
+    let tab_data = serde_json::to_string(&request).map_err(|e| e.to_string())?;
+    db.repository.save_temporary_request(&request.id, &tab_data).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_temporary_request(db: tauri::State<'_, Arc<Database>>) -> Result<Option<HttpRequest>, String> {
-    db.get_temporary_request().map_err(|e| e.to_string())
+    let tab_data = db.repository.get_open_tabs("temporary")
+        .map_err(|e| e.to_string())?;
+    
+    match tab_data {
+        Some((data, _)) => {
+            let request: HttpRequest = serde_json::from_str(&data)
+                .map_err(|e| format!("解析临时请求失败: {}", e))?;
+            Ok(Some(request))
+        }
+        None => Ok(None),
+    }
 }
 
 #[tauri::command]
 fn clear_temporary_request(db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.clear_temporary_request().map_err(|e| e.to_string())
+    db.repository.delete_open_tab("temporary")
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn save_app_state(state: AppState, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.save_app_state(&state).map_err(|e| e.to_string())
+    db.repository.save_app_state(&state).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_app_state(db: tauri::State<'_, Arc<Database>>) -> Result<AppState, String> {
-    db.get_app_state().map_err(|e| e.to_string())
+    match db.repository.get_app_state() {
+        Ok(Some(state)) => Ok(state),
+        Ok(None) => Ok(AppState {
+            current_request_id: None,
+            current_environment_id: None,
+            sidebar_collapsed: false,
+            request_panel_height: None,
+            response_panel_height: None,
+        }),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 #[tauri::command]
 fn save_environment(environment: Environment, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.save_environment(&environment).map_err(|e| e.to_string())
+    db.repository.save_environment(&environment).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_all_environments(db: tauri::State<'_, Arc<Database>>) -> Result<Vec<Environment>, String> {
-    db.get_all_environments().map_err(|e| e.to_string())
+    db.repository.get_all_environments().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn delete_environment(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.delete_environment(&id).map_err(|e| e.to_string())
+    db.repository.delete_environment(&id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -332,22 +437,24 @@ fn delete_secret(
 
 #[tauri::command]
 fn save_collection(collection: Collection, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.save_collection(&collection).map_err(|e| e.to_string())
+    db.repository.save_collection(&collection).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_all_collections(db: tauri::State<'_, Arc<Database>>) -> Result<Vec<Collection>, String> {
-    db.get_all_collections().map_err(|e| e.to_string())
+    db.repository.get_all_collections().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn delete_collection(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.delete_collection(&id).map_err(|e| e.to_string())
+    db.repository.delete_collection(&id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn rename_collection(id: String, name: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.rename_collection(&id, &name).map_err(|e| e.to_string())
+    let now = chrono::Utc::now().to_rfc3339();
+    db.repository.rename_collection(&id, &name, &now)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -357,8 +464,11 @@ fn save_request_to_collection(
     folder_id: Option<String>,
     db: tauri::State<'_, Arc<Database>>,
 ) -> Result<(), String> {
-    db.save_request_to_collection(&request, &collection_id, folder_id.as_deref())
-        .map_err(|e| e.to_string())
+    // 直接保存请求，关联 collection_id 和 folder_id
+    let mut req = request;
+    req.collection_id = Some(collection_id);
+    req.folder_id = folder_id;
+    db.repository.save_request(&req).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -366,27 +476,37 @@ fn get_requests_by_collection(
     collection_id: String,
     db: tauri::State<'_, Arc<Database>>,
 ) -> Result<Vec<HttpRequest>, String> {
-    db.get_requests_by_collection(&collection_id)
+    db.repository.get_requests_by_collection(&collection_id)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn rename_request(id: String, name: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.rename_request(&id, &name).map_err(|e| e.to_string())
+    let now = chrono::Utc::now().to_rfc3339();
+    db.repository.rename_request(&id, &name, &now)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn delete_request_from_collection(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.delete_request_from_collection(&id).map_err(|e| e.to_string())
+    db.repository.delete_request(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn batch_delete_requests(request_ids: Vec<String>, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
+    db.repository.batch_delete_requests(&request_ids)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn save_open_tabs(tabs_data: String, active_tab_id: Option<String>, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
-    db.save_open_tabs(&tabs_data, active_tab_id.as_deref())
+    let now = chrono::Utc::now().to_rfc3339();
+    db.repository.save_open_tabs("current_tabs", &tabs_data, &active_tab_id, &now)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_open_tabs(db: tauri::State<'_, Arc<Database>>) -> Result<Option<(String, Option<String>)>, String> {
-    db.get_open_tabs().map_err(|e| e.to_string())
+    db.repository.get_open_tabs("current_tabs")
+        .map_err(|e| e.to_string())
 }

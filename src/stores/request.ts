@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
 import type {
@@ -11,6 +11,7 @@ import type {
   Response,
   RequestTab,
 } from '@/types'
+import { safeParseDate } from '@/types'
 
 const createDefaultRequest = (): Request => ({
   id: crypto.randomUUID(),
@@ -29,14 +30,34 @@ export const useRequestStore = defineStore('request', () => {
   const collections = ref<Collection[]>([])
   const tabs = ref<RequestTab[]>([])
   const activeTabId = ref<string | null>(null)
-  const responses = ref<Record<string, Response>>({})
+  const responses = shallowRef<Record<string, Response>>({})
 
   function setResponse(tabId: string, response: Response) {
-    responses.value[tabId] = response
+    responses.value = { ...responses.value, [tabId]: response }
   }
+
+  function clearTabResponse(tabId: string) {
+    delete responses.value[tabId]
+  }
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const pendingRequestId = ref<string | null>(null)
+  const uploadProgress = ref<number>(0)
+  const downloadProgress = ref<number>(0)
+
+  function setUploadProgress(progress: number) {
+    uploadProgress.value = progress
+  }
+
+  function setDownloadProgress(progress: number) {
+    downloadProgress.value = progress
+  }
+
+  function resetProgress() {
+    uploadProgress.value = 0
+    downloadProgress.value = 0
+  }
 
   const currentTab = computed(() => tabs.value.find((t) => t.id === activeTabId.value) || null)
 
@@ -73,7 +94,7 @@ export const useRequestStore = defineStore('request', () => {
     if (index === -1) return
 
     tabs.value.splice(index, 1)
-    delete responses.value[tabId]
+    clearTabResponse(tabId)
 
     if (activeTabId.value === tabId) {
       if (tabs.value.length > 0) {
@@ -91,7 +112,7 @@ export const useRequestStore = defineStore('request', () => {
 
     const removedTabs = tabs.value.splice(0, index)
     removedTabs.forEach((tab) => {
-      delete responses.value[tab.id]
+      clearTabResponse(tab.id)
     })
 
     if (!tabs.value.find((t) => t.id === activeTabId.value)) {
@@ -105,7 +126,7 @@ export const useRequestStore = defineStore('request', () => {
 
     const removedTabs = tabs.value.splice(index + 1)
     removedTabs.forEach((tab) => {
-      delete responses.value[tab.id]
+      clearTabResponse(tab.id)
     })
 
     if (!tabs.value.find((t) => t.id === activeTabId.value)) {
@@ -115,7 +136,7 @@ export const useRequestStore = defineStore('request', () => {
 
   function closeAllTabs() {
     tabs.value.forEach((tab) => {
-      delete responses.value[tab.id]
+      clearTabResponse(tab.id)
     })
     tabs.value = []
     activeTabId.value = null
@@ -355,10 +376,18 @@ export const useRequestStore = defineStore('request', () => {
       const loadedCollections = await invoke<Collection[]>('get_all_collections')
       if (loadedCollections) {
         for (const collection of loadedCollections) {
+          // 确保时间字段有效
+          collection.createdAt = safeParseDate(collection.createdAt)
+          collection.updatedAt = safeParseDate(collection.updatedAt)
+
           const requests = await invoke<Request[]>('get_requests_by_collection', {
             collectionId: collection.id,
           })
-          collection.requests = requests || []
+          collection.requests = (requests || []).map((request) => ({
+            ...request,
+            createdAt: safeParseDate(request.createdAt),
+            updatedAt: safeParseDate(request.updatedAt),
+          }))
           collection.folders = []
         }
         collections.value = loadedCollections
@@ -467,6 +496,192 @@ export const useRequestStore = defineStore('request', () => {
     }
   }
 
+  // ===== 批量操作功能 =====
+
+  // 选中的请求 ID 集合
+  const selectedRequestIds = ref<Set<string>>(new Set())
+  // 是否启用选择模式
+  const isSelectionMode = ref(false)
+
+  function toggleSelection(requestId: string) {
+    if (selectedRequestIds.value.has(requestId)) {
+      selectedRequestIds.value.delete(requestId)
+    } else {
+      selectedRequestIds.value.add(requestId)
+    }
+  }
+
+  function selectRequest(requestId: string) {
+    selectedRequestIds.value.add(requestId)
+  }
+
+  function deselectRequest(requestId: string) {
+    selectedRequestIds.value.delete(requestId)
+  }
+
+  function clearSelection() {
+    selectedRequestIds.value.clear()
+  }
+
+  function toggleSelectionMode() {
+    isSelectionMode.value = !isSelectionMode.value
+    if (!isSelectionMode.value) {
+      clearSelection()
+    }
+  }
+
+  function selectAllRequests(requests: Request[]) {
+    requests.forEach((req) => selectedRequestIds.value.add(req.id))
+  }
+
+  function isInSelection(requestId: string): boolean {
+    return selectedRequestIds.value.has(requestId)
+  }
+
+  // 批量删除请求
+  async function batchDeleteRequests(collectionId: string, requestIds: string[]) {
+    try {
+      await invoke('batch_delete_requests', { requestIds })
+
+      const collection = collections.value.find((c: Collection) => c.id === collectionId)
+      if (collection) {
+        collection.requests = collection.requests.filter((r: Request) => !requestIds.includes(r.id))
+
+        const deleteFromFolder = (folders: Folder[]) => {
+          for (const folder of folders) {
+            folder.requests = folder.requests.filter((r: Request) => !requestIds.includes(r.id))
+            deleteFromFolder(folder.folders)
+          }
+        }
+        deleteFromFolder(collection.folders)
+      }
+
+      const tabsToRemove = tabs.value.filter((t) => requestIds.includes(t.request.id))
+      tabsToRemove.forEach((tab) => {
+        closeTab(tab.id)
+      })
+
+      clearSelection()
+    } catch (e) {
+      console.error('批量删除请求失败:', e)
+      throw e
+    }
+  }
+
+  // 批量移动请求到文件夹
+  async function batchMoveRequests(
+    fromCollectionId: string,
+    toCollectionId: string,
+    toFolderId: string | null,
+    requestIds: string[]
+  ) {
+    try {
+      // 获取要移动的请求
+      const fromCollection = collections.value.find((c) => c.id === fromCollectionId)
+      if (!fromCollection) throw new Error('源集合不存在')
+
+      const requestsToMove: Request[] = []
+      const findRequests = (folders: Folder[]) => {
+        for (const folder of folders) {
+          requestsToMove.push(...folder.requests.filter((r) => requestIds.includes(r.id)))
+          findRequests(folder.folders)
+        }
+      }
+      requestsToMove.push(...fromCollection.requests.filter((r) => requestIds.includes(r.id)))
+      findRequests(fromCollection.folders)
+
+      // 添加到目标集合或文件夹
+      const toCollection = collections.value.find((c) => c.id === toCollectionId)
+      if (!toCollection) throw new Error('目标集合不存在')
+
+      for (const request of requestsToMove) {
+        await invoke('save_request_to_collection', {
+          request,
+          collectionId: toCollectionId,
+          folderId: toFolderId,
+        })
+
+        // 从原位置删除
+        await invoke('delete_request_from_collection', { id: request.id })
+      }
+
+      // 更新本地状态
+      fromCollection.requests = fromCollection.requests.filter((r) => !requestIds.includes(r.id))
+
+      if (toFolderId) {
+        const addToFolder = (folders: Folder[]): boolean => {
+          for (const folder of folders) {
+            if (folder.id === toFolderId) {
+              folder.requests.push(...requestsToMove)
+              return true
+            }
+            if (addToFolder(folder.folders)) return true
+          }
+          return false
+        }
+        addToFolder(toCollection.folders)
+      } else {
+        toCollection.requests.push(...requestsToMove)
+      }
+
+      clearSelection()
+    } catch (e) {
+      console.error('批量移动请求失败:', e)
+      throw e
+    }
+  }
+
+  // 批量复制请求
+  async function batchCopyRequests(
+    toCollectionId: string,
+    toFolderId: string | null,
+    requestIds: string[]
+  ) {
+    try {
+      const toCollection = collections.value.find((c) => c.id === toCollectionId)
+      if (!toCollection) throw new Error('目标集合不存在')
+
+      // 查找所有要复制的请求
+      const requestsToCopy: Request[] = []
+      const findRequests = (collection: Collection) => {
+        requestsToCopy.push(...collection.requests.filter((r) => requestIds.includes(r.id)))
+        const searchFolders = (folders: Folder[]) => {
+          for (const folder of folders) {
+            requestsToCopy.push(...folder.requests.filter((r) => requestIds.includes(r.id)))
+            searchFolders(folder.folders)
+          }
+        }
+        searchFolders(collection.folders)
+      }
+
+      for (const collection of collections.value) {
+        findRequests(collection)
+      }
+
+      // 创建副本并添加
+      for (const request of requestsToCopy) {
+        const newRequest: Request = {
+          ...JSON.parse(JSON.stringify(request)),
+          id: crypto.randomUUID(),
+          name: `${request.name} (副本)`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        await invoke('save_request_to_collection', {
+          request: newRequest,
+          collectionId: toCollectionId,
+          folderId: toFolderId,
+        })
+      }
+
+      clearSelection()
+    } catch (e) {
+      console.error('批量复制请求失败:', e)
+      throw e
+    }
+  }
+
   function setPendingRequestId(id: string | null) {
     pendingRequestId.value = id
   }
@@ -482,7 +697,11 @@ export const useRequestStore = defineStore('request', () => {
     isLoading,
     error,
     pendingRequestId,
+    uploadProgress,
+    downloadProgress,
     currentCollection,
+    selectedRequestIds,
+    isSelectionMode,
     openRequest,
     closeTab,
     closeTabsToLeft,
@@ -510,10 +729,25 @@ export const useRequestStore = defineStore('request', () => {
     cancelCurrentRequest,
     setPendingRequestId,
     setResponse,
+    clearTabResponse,
     loadCollections,
     renameRequest,
     saveTabs,
     loadTabs,
     initTabsPersistence,
+    setUploadProgress,
+    setDownloadProgress,
+    resetProgress,
+    // 批量操作
+    toggleSelection,
+    selectRequest,
+    deselectRequest,
+    clearSelection,
+    toggleSelectionMode,
+    selectAllRequests,
+    isInSelection,
+    batchDeleteRequests,
+    batchMoveRequests,
+    batchCopyRequests,
   }
 })

@@ -41,14 +41,12 @@ watch(
 )
 
 watch(
-  () => props.collections,
-  (collections) => {
-    // 新增集合后自动选中
-    if (collections.length > 0 && !selectedCollectionId.value) {
-      selectedCollectionId.value = collections[collections.length - 1].id
+  () => props.collections.length,
+  () => {
+    if (props.collections.length > 0 && !selectedCollectionId.value) {
+      selectedCollectionId.value = props.collections[props.collections.length - 1].id
     }
-  },
-  { deep: true }
+  }
 )
 
 function handleSave() {

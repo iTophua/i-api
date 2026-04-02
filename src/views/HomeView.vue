@@ -5,6 +5,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useSettingsStore, useEnvironmentStore, useRequestStore } from '@/stores'
 import { useShortcuts } from '@/composables/useShortcuts'
 import { useI18n } from '@/composables/useI18n'
+import { useTabDrag } from '@/composables/useTabDrag'
 import TitleBar from '@/components/common/TitleBar.vue'
 import Sidebar from '@/components/sidebar/Sidebar.vue'
 import RequestPanel from '@/components/request/RequestPanel.vue'
@@ -18,7 +19,8 @@ import HarImportModal from '@/components/common/HarImportModal.vue'
 import SaveRequestModal from '@/components/common/SaveRequestModal.vue'
 import SettingsModal from '@/components/common/SettingsModal.vue'
 import { generateCode } from '@/utils/codeGenerator'
-import type { RequestTab, Request, RequestBody, AuthConfig } from '@/types'
+import type { RequestTab } from '@/types'
+import { normalizeRequest } from '@/types'
 
 const message = useMessage()
 const settingsStore = useSettingsStore()
@@ -48,27 +50,7 @@ const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const contextMenuTabId = ref<string | null>(null)
 
-const dragState = ref<{
-  dragging: boolean
-  tabId: string | null
-  startX: number
-  startIndex: number
-  currentIndex: number
-  tabWidth: number
-  offsetX: number
-}>({
-  dragging: false,
-  tabId: null,
-  startX: 0,
-  startIndex: 0,
-  currentIndex: 0,
-  tabWidth: 0,
-  offsetX: 0,
-})
-
-function toggleTheme() {
-  settingsStore.setTheme(settingsStore.settings.theme === 'dark' ? 'light' : 'dark')
-}
+const { dragState, handleDragStart, cleanup: cleanupDrag } = useTabDrag(requestStore.moveTab)
 
 function toggleSidebar() {
   collapsed.value = !collapsed.value
@@ -91,64 +73,8 @@ function handleImportSelect(key: string) {
   }
 }
 
-function normalizeRequest(request: any): Request {
-  return {
-    id: request.id || crypto.randomUUID(),
-    name: request.name || t('request.untitledRequest'),
-    description: request.description,
-    method: request.method || 'GET',
-    url: request.url || '',
-    params: request.params || [],
-    headers: request.headers || [],
-    body: normalizeBody(request.body),
-    auth: normalizeAuth(request.auth),
-    preScript: request.preScript || request.pre_script,
-    postScript: request.postScript || request.post_script,
-    createdAt: request.createdAt || request.created_at || new Date().toISOString(),
-    updatedAt: request.updatedAt || request.updated_at || new Date().toISOString(),
-  }
-}
-
-function normalizeBody(body: any): RequestBody {
-  if (!body) return { mode: 'none' }
-  return {
-    mode: body.mode || body.bodyMode || 'none',
-    raw: body.raw,
-    rawType: body.rawType || body.raw_type,
-    formData: body.formData || body.form_data,
-    urlencoded: body.urlencoded,
-    binary: body.binary,
-  }
-}
-
-function normalizeAuth(auth: any): AuthConfig {
-  if (!auth) return { type: 'none' }
-  return {
-    type: auth.type || auth.authType || 'none',
-    basic: auth.basic,
-    bearer: auth.bearer,
-    apikey: auth.apikey
-      ? {
-          key: auth.apikey.key,
-          value: auth.apikey.value,
-          addTo: auth.apikey.addTo || auth.apikey.add_to || 'header',
-        }
-      : undefined,
-  }
-}
-
 function handleCurlImport(request: any) {
-  console.log('=== cURL Import Debug ===')
-  console.log('1. Raw imported request:', JSON.stringify(request, null, 2))
-  console.log('2. Request body:', JSON.stringify(request.body, null, 2))
-  console.log('3. Request body mode:', request.body?.mode || request.body?.bodyMode)
-  console.log('4. Request body raw:', request.body?.raw)
-  console.log('5. Request headers:', JSON.stringify(request.headers, null, 2))
-
   const normalizedRequest = normalizeRequest(request)
-  console.log('6. Normalized request:', JSON.stringify(normalizedRequest, null, 2))
-  console.log('7. Normalized body:', JSON.stringify(normalizedRequest.body, null, 2))
-
   requestStore.openRequest(normalizedRequest, undefined, true)
   message.success(t('import.importSuccess', { count: 1 }))
 }
@@ -234,80 +160,6 @@ function handleContextMenuClickoutside() {
   contextMenuTabId.value = null
 }
 
-function handleDragStart(e: MouseEvent, tabId: string) {
-  if (e.button !== 0) return
-
-  const index = requestStore.tabs.findIndex((t) => t.id === tabId)
-  if (index === -1) return
-
-  const tabElement = e.currentTarget as HTMLElement
-  const rect = tabElement.getBoundingClientRect()
-
-  dragState.value = {
-    dragging: true,
-    tabId,
-    startX: e.clientX,
-    startIndex: index,
-    currentIndex: index,
-    tabWidth: rect.width,
-    offsetX: 0,
-  }
-
-  document.addEventListener('mousemove', handleDragMove)
-  document.addEventListener('mouseup', handleDragEnd)
-}
-
-function handleDragMove(e: MouseEvent) {
-  if (!dragState.value.dragging) return
-
-  const tabsContainer = document.querySelector('.tabs-scroll')
-  if (!tabsContainer) return
-
-  const tabElements = Array.from(tabsContainer.querySelectorAll('.tab-item')) as HTMLElement[]
-  const mouseX = e.clientX
-
-  dragState.value.offsetX = mouseX - dragState.value.startX
-
-  let newIndex = dragState.value.startIndex
-  for (let i = 0; i < tabElements.length; i++) {
-    if (tabElements[i].dataset.tabId === dragState.value.tabId) continue
-    const rect = tabElements[i].getBoundingClientRect()
-    const midpoint = rect.left + rect.width / 2
-    if (mouseX < midpoint) {
-      newIndex = i > dragState.value.startIndex ? i - 1 : i
-      break
-    }
-    if (i === tabElements.length - 1) {
-      newIndex = i
-    }
-  }
-
-  if (newIndex !== dragState.value.currentIndex) {
-    dragState.value.currentIndex = newIndex
-  }
-}
-
-function handleDragEnd() {
-  if (!dragState.value.dragging) return
-
-  if (dragState.value.startIndex !== dragState.value.currentIndex) {
-    requestStore.moveTab(dragState.value.startIndex, dragState.value.currentIndex)
-  }
-
-  dragState.value = {
-    dragging: false,
-    tabId: null,
-    startX: 0,
-    startIndex: 0,
-    currentIndex: 0,
-    tabWidth: 0,
-    offsetX: 0,
-  }
-
-  document.removeEventListener('mousemove', handleDragMove)
-  document.removeEventListener('mouseup', handleDragEnd)
-}
-
 function getTabLabel(tab: RequestTab): string {
   return tab.request.name || t('request.untitledRequest')
 }
@@ -337,8 +189,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   saveAppState()
-  document.removeEventListener('mousemove', handleDragMove)
-  document.removeEventListener('mouseup', handleDragEnd)
+  cleanupDrag()
 })
 
 watch(collapsed, (val) => {
@@ -420,7 +271,7 @@ useShortcuts([
               "
               @click="requestStore.switchTab(tab.id)"
               @contextmenu="handleContextMenu($event, tab.id)"
-              @mousedown="handleDragStart($event, tab.id)"
+              @mousedown="handleDragStart($event, tab.id, requestStore.tabs)"
             >
               <span class="tab-method" :class="'method-' + tab.request.method.toLowerCase()">
                 {{ tab.request.method }}

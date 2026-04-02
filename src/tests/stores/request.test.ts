@@ -173,23 +173,22 @@ describe('Request Store', () => {
   })
 
   describe('createCollection', () => {
-    it('should create a new collection', () => {
+    it('should create a new collection', async () => {
       const store = useRequestStore()
 
-      const collection = store.createCollection('My Collection')
+      await store.createCollection('My Collection')
 
       expect(store.collections.length).toBe(1)
       expect(store.collections[0].name).toBe('My Collection')
-      expect(collection).toBeDefined()
     })
   })
 
   describe('deleteCollection', () => {
-    it('should delete a collection', () => {
+    it('should delete a collection', async () => {
       const store = useRequestStore()
 
-      const collection = store.createCollection('Test Collection')
-      store.deleteCollection(collection.id)
+      const collection = await store.createCollection('Test Collection')
+      await store.deleteCollection(collection.id)
 
       expect(store.collections.length).toBe(0)
     })

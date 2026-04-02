@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
 import type { Settings, AppState, Locale } from '@/types'
@@ -26,6 +26,17 @@ export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<Settings>({ ...defaultSettings })
   const appState = ref<AppState>({ ...defaultAppState })
   let mediaQuery: MediaQueryList | null = null
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null
+
+  // 计算属性优化：避免重复计算
+  const isDarkTheme = computed(() => {
+    if (settings.value.theme === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches
+    }
+    return settings.value.theme === 'dark'
+  })
+
+  const currentLocale = computed(() => settings.value.language)
 
   function updateSettings(updates: Partial<Settings>) {
     Object.assign(settings.value, updates)
@@ -88,6 +99,16 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  // 防抖保存设置
+  function debouncedSaveSettings() {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
+    saveTimeout = setTimeout(() => {
+      saveSettings()
+    }, 500)
+  }
+
   async function saveSettings() {
     try {
       localStorage.setItem('iapi-settings', JSON.stringify(settings.value))
@@ -117,15 +138,17 @@ export const useSettingsStore = defineStore('settings', () => {
     Object.assign(appState.value, updates)
   }
 
+  // 优化 watch：只监听必要字段
   watch(
     () => settings.value.theme,
     (theme) => applyTheme(theme),
     { immediate: true }
   )
 
+  // 使用防抖保存
   watch(
     () => settings.value,
-    () => saveSettings(),
+    () => debouncedSaveSettings(),
     { deep: true }
   )
 
@@ -134,6 +157,8 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     settings,
     appState,
+    isDarkTheme,
+    currentLocale,
     updateSettings,
     setTheme,
     setLanguage,

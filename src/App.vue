@@ -38,18 +38,7 @@ onUnmounted(() => {
 </template>
 
 <style>
-:root {
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 12px;
-  --spacing-lg: 16px;
-  --spacing-xl: 24px;
-
-  --z-dropdown: 1000;
-  --z-modal: 2000;
-  --z-toast: 3000;
-  --z-tooltip: 4000;
-}
+@import './styles/theme.css';
 
 * {
   margin: 0;
@@ -62,18 +51,14 @@ body,
 #app {
   height: 100%;
   overflow: hidden;
-  background-color: #ffffff;
-  color: #333333;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
   transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
-}
-
-[data-theme='dark'] html,
-[data-theme='dark'] body,
-[data-theme='dark'] #app {
-  background-color: #1a1a1a;
-  color: #e0e0e0;
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 /* Webkit 滚动条 */
@@ -88,7 +73,7 @@ body,
 
 ::-webkit-scrollbar-thumb {
   background: rgba(128, 128, 128, 0.4);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {

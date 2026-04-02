@@ -5,6 +5,9 @@ import { computed, ref, shallowRef, onMounted } from 'vue'
 import { useRequestStore } from '@/stores'
 import { formatJsonString, detectLanguage } from '@/composables/useMonacoEditor'
 import type { Response } from '@/types'
+import ResponseStats from './ResponseStats.vue'
+import TestResultsPanel from './TestResultsPanel.vue'
+import LargeTextEditor from '@/components/common/LargeTextEditor.vue'
 
 const MonacoEditor = shallowRef<any>(null)
 const editorRef = ref<any>(null)
@@ -18,7 +21,7 @@ const requestStore = useRequestStore()
 
 const currentTab = ref('body')
 
-const response = computed<Response | null>(() => requestStore.currentResponse as any)
+const response = computed<Response | null>(() => requestStore.currentResponse)
 
 const status = computed(() => response.value?.status || 0)
 const statusText = computed(() => response.value?.statusText || '')
@@ -67,6 +70,14 @@ const formattedSize = computed(() => {
   return `${(size / 1024 / 1024).toFixed(2)} MB`
 })
 
+// 判断是否使用大型文本编辑器
+const shouldUseLargeEditor = computed(() => {
+  const content = responseContent.value
+  if (!content) return false
+  const lineCount = content.split('\n').length
+  return lineCount > 1000 || content.length > 500000
+})
+
 function formatResponse() {
   if (responseLanguage.value === 'json' && responseContent.value) {
     const formatted = formatJsonString(responseContent.value)
@@ -88,6 +99,12 @@ const headerList = computed(() => {
 })
 
 const cookieList = computed(() => response.value?.cookies || [])
+
+const testResults = computed(() => {
+  const currentTab = requestStore.currentTab
+  if (!currentTab?.testResults) return null
+  return currentTab.testResults
+})
 </script>
 
 <template>
@@ -155,16 +172,27 @@ const cookieList = computed(() => response.value?.cookies || [])
     <!-- 响应内容 -->
     <div v-if="response" class="response-content">
       <NTabs v-model:value="currentTab" type="line">
+        <NTabPane name="stats">
+          <template #tab>概览</template>
+          <ResponseStats />
+        </NTabPane>
+
         <NTabPane name="body">
           <template #tab>Body</template>
           <div class="editor-wrapper">
+            <LargeTextEditor
+              v-if="shouldUseLargeEditor"
+              :model-value="formattedResponseContent"
+              :language="responseLanguage"
+            />
             <MonacoEditor
-              v-if="MonacoEditor"
+              v-else-if="MonacoEditor.value"
               ref="editorRef"
               :model-value="formattedResponseContent"
               :language="responseLanguage"
               read-only
               height="100%"
+              :enable-performance-optimization="true"
             />
           </div>
         </NTabPane>
@@ -214,6 +242,23 @@ const cookieList = computed(() => response.value?.cookies || [])
             </div>
             <NEmpty v-else description="无 Cookies" style="padding: 40px" />
           </NScrollbar>
+        </NTabPane>
+
+        <NTabPane name="tests">
+          <template #tab>
+            <span class="tab-with-count">
+              Tests
+              <NTag
+                v-if="testResults"
+                :type="testResults.passed === testResults.total ? 'success' : 'error'"
+                size="small"
+                :bordered="false"
+              >
+                {{ testResults?.passed || 0 }}/{{ testResults?.total || 0 }}
+              </NTag>
+            </span>
+          </template>
+          <TestResultsPanel />
         </NTabPane>
       </NTabs>
     </div>

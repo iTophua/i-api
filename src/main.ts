@@ -5,6 +5,7 @@ import { createI18nInstance } from './locales'
 import { setI18nInstance } from './stores/settings'
 import App from './App.vue'
 import type { Locale } from './locales'
+import './styles/theme.css'
 
 const savedLocale = (localStorage.getItem('iapi-locale') as Locale) || 'zh-CN'
 

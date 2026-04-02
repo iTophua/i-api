@@ -12,6 +12,7 @@ import {
   NSwitch,
   NTag,
   useMessage,
+  NProgress,
 } from 'naive-ui'
 import { SettingsOutline, ChevronDownOutline, StopOutline } from '@vicons/ionicons5'
 import { ref, computed, onMounted, onUnmounted, h } from 'vue'
@@ -64,8 +65,8 @@ function renderMethodLabel(option: { label: string; value: string }) {
     NTag,
     {
       type: tagType,
-      size: 'small',
-      bordered: false,
+      size: 'medium',
+      bordered: true,
     },
     { default: () => option.label }
   )
@@ -104,6 +105,7 @@ async function sendRequest(download = false) {
   requestStore.isLoading = true
   requestStore.error = null
   requestStore.setPendingRequestId(requestStore.currentRequest.id)
+  requestStore.resetProgress()
 
   try {
     const request = {
@@ -121,6 +123,9 @@ async function sendRequest(download = false) {
       request,
       historyLimit: settingsStore.settings?.historyLimit ?? 100,
     })
+
+    requestStore.setUploadProgress(100)
+    requestStore.setDownloadProgress(100)
 
     historyStore.addHistory({
       requestId: requestStore.currentRequest.id,
@@ -151,6 +156,7 @@ async function sendRequest(download = false) {
   } finally {
     requestStore.isLoading = false
     requestStore.setPendingRequestId(null)
+    setTimeout(() => requestStore.resetProgress(), 1000)
   }
 }
 
@@ -345,50 +351,90 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="request-panel">
-    <div class="url-bar">
+  <div class="request-panel" role="region" aria-label="请求面板">
+    <div class="url-bar" role="toolbar" aria-label="请求工具栏">
       <NSelect
         :value="requestStore.currentRequest.method"
         :options="methodOptions"
         :consistent-menu-width="false"
         :render-label="renderMethodLabel"
+        :render-tag="renderMethodLabel"
         style="width: 100px"
+        aria-label="HTTP 方法选择"
         @update:value="requestStore.updateMethod"
       />
       <NInput
         :value="requestStore.currentRequest.url"
         :placeholder="t('request.enterUrl')"
         class="url-input"
+        aria-label="请求 URL 输入"
         @update:value="requestStore.updateUrl"
         @keyup.enter="sendRequest()"
       />
-      <NButton v-if="requestStore.isLoading" type="error" class="send-btn" @click="cancelRequest">
+      <NButton
+        v-if="requestStore.isLoading"
+        type="error"
+        class="send-btn"
+        aria-label="取消请求"
+        @click="cancelRequest"
+      >
         <template #icon>
           <NIcon :component="StopOutline" />
         </template>
         {{ t('request.cancel') }}
       </NButton>
-      <div v-else class="send-btn-group">
+      <div v-else class="send-btn-group" role="group" aria-label="发送操作">
         <NButton
           type="primary"
           class="send-btn"
           :loading="requestStore.isLoading"
+          :aria-busy="requestStore.isLoading"
           @click="sendRequest()"
         >
           {{ t('request.send') }}
         </NButton>
         <NDropdown :options="sendOptions" placement="bottom-end" @select="handleSendSelect">
-          <NButton type="primary" class="send-btn-dropdown">
+          <NButton type="primary" class="send-btn-dropdown" aria-label="发送选项">
             <NIcon :component="ChevronDownOutline" />
           </NButton>
         </NDropdown>
       </div>
-      <div class="save-btn-group">
-        <NButton class="save-btn" @click="handleSaveDirect">
-          {{ t('request.save') }}
-        </NButton>
+
+      <!-- 进度指示 -->
+      <div v-if="requestStore.isLoading" class="progress-container">
+        <div
+          v-if="requestStore.uploadProgress.value > 0 && requestStore.uploadProgress.value < 100"
+          class="progress-item"
+        >
+          <span class="progress-label">上传</span>
+          <NProgress
+            :percentage="requestStore.uploadProgress.value"
+            :show-indicator="false"
+            height="6px"
+            status="success"
+            class="progress-bar"
+          />
+        </div>
+        <div
+          v-if="
+            requestStore.downloadProgress.value > 0 && requestStore.downloadProgress.value < 100
+          "
+          class="progress-item"
+        >
+          <span class="progress-label">下载</span>
+          <NProgress
+            :percentage="requestStore.downloadProgress.value"
+            :show-indicator="false"
+            height="6px"
+            status="success"
+            class="progress-bar"
+          />
+        </div>
+      </div>
+      <div class="save-btn-group" role="group" aria-label="保存操作">
+        <NButton class="save-btn" @click="handleSaveDirect">{{ t('request.save') }}</NButton>
         <NDropdown :options="saveOptions" placement="bottom-end" @select="handleSave">
-          <NButton class="save-btn-dropdown">
+          <NButton class="save-btn-dropdown" aria-label="保存选项">
             <NIcon :component="ChevronDownOutline" />
           </NButton>
         </NDropdown>
@@ -396,7 +442,7 @@ onUnmounted(() => {
     </div>
 
     <div class="request-tabs-container">
-      <NTabs v-model:value="currentTab" type="line">
+      <NTabs v-model:value="currentTab" type="line" role="tablist" aria-label="请求选项卡">
         <NTabPane name="params">
           <template #tab>
             <span class="tab-with-badge">
@@ -603,6 +649,42 @@ onUnmounted(() => {
 
 .save-btn-group :deep(.n-dropdown-menu) {
   transform: translateX(-100%);
+}
+
+/* 进度指示 */
+.progress-container {
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  background: var(--n-color-modal);
+  border-top: 1px solid var(--n-border-color);
+}
+
+.progress-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-label {
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  min-width: 30px;
+  font-weight: 500;
+}
+
+.progress-bar {
+  flex: 1;
+  transition: all 0.3s ease;
+}
+
+.url-bar {
+  position: relative;
 }
 
 /* 调整下拉菜单位置，使其显示在发送按钮正下方 */

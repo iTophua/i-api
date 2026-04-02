@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
 import type { Environment, Variable } from '@/types'
+import { safeParseDate } from '@/types'
 
 export const useEnvironmentStore = defineStore('environment', () => {
   const environments = ref<Environment[]>([])
@@ -263,7 +264,11 @@ export const useEnvironmentStore = defineStore('environment', () => {
       const loadedEnvs = await invoke<Environment[]>('get_all_environments')
 
       if (loadedEnvs && loadedEnvs.length > 0) {
-        environments.value = loadedEnvs
+        environments.value = loadedEnvs.map(env => ({
+          ...env,
+          createdAt: safeParseDate(env.createdAt),
+          updatedAt: safeParseDate(env.updatedAt),
+        }))
       } else {
         const defaultEnv: Environment = {
           id: 'default',

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { NModal, NCard, NSelect, NButton, NSpace } from 'naive-ui'
+import { NModal, NCard, NSelect, NButton, NSpace, useMessage } from 'naive-ui'
 import { ref, computed, shallowRef, onMounted } from 'vue'
 import type { Request } from '@/types'
 import { generateCode, type CodeLanguage } from '@/utils/codeGenerator'
 
 const MonacoEditor = shallowRef<any>(null)
+const message = useMessage()
 
 onMounted(async () => {
   const mod = await import('@/components/common/MonacoEditor.vue')
@@ -30,6 +31,7 @@ const languageOptions = [
 ]
 
 const selectedLanguage = ref<CodeLanguage>('curl')
+const isCopying = ref(false)
 
 const code = computed(() => {
   if (!props.request) return ''
@@ -48,9 +50,21 @@ const editorLanguage = computed(() => {
   return langMap[selectedLanguage.value] || 'plaintext'
 })
 
-function copyCode() {
-  if (code.value) {
-    navigator.clipboard.writeText(code.value)
+async function copyCode() {
+  if (!code.value) {
+    message.warning('没有可复制的代码')
+    return
+  }
+  
+  try {
+    isCopying.value = true
+    await navigator.clipboard.writeText(code.value)
+    message.success('代码已复制到剪贴板')
+  } catch (err) {
+    console.error('复制失败:', err)
+    message.error('复制失败，请手动复制')
+  } finally {
+    isCopying.value = false
   }
 }
 
@@ -69,12 +83,12 @@ function handleClose() {
             :options="languageOptions"
             style="width: 200px"
           />
-          <NButton @click="copyCode">复制代码</NButton>
+          <NButton :loading="isCopying" @click="copyCode">复制代码</NButton>
         </div>
 
         <div class="code-preview">
           <MonacoEditor
-            v-if="MonacoEditor"
+            v-if="MonacoEditor.value"
             :model-value="code"
             :language="editorLanguage"
             read-only

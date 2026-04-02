@@ -13,11 +13,14 @@ src-tauri/
 │   ├── main.rs           # 应用启动入口
 │   ├── error.rs          # 错误类型定义 (IApiError)
 │   ├── http/             # HTTP 请求发送 + 取消 (reqwest)
-│   ├── database/         # SQLite CRUD (rusqlite)
+│   ├── database/         # SQLite CRUD (rusqlite) + 连接池(10) + 优化器
+│   │   ├── mod.rs        # 连接池 + schema 初始化
+│   │   ├── repository.rs # CRUD 操作
+│   │   └── optimizer.rs  # WAL/索引/查询优化
 │   ├── models/           # 数据模型 (HttpRequest, HttpResponse, Collection, etc.)
-│   ├── curl/             # cURL 命令解析
+│   ├── curl/             # cURL 命令解析 (641行)
 │   ├── openapi/          # OpenAPI/HAR 导入
-│   ├── script/           # 前后置脚本执行
+│   ├── script/           # 前后置脚本执行 (JavaScript)
 │   └── secure_storage.rs # Keyring 凭证存储
 ├── Cargo.toml            # Rust 依赖配置
 ├── tauri.conf.json       # Tauri 应用配置
@@ -30,7 +33,7 @@ src-tauri/
 | ------------ | --------------------- | -------------------------------------------------------- |
 | 新增 command | `src/lib.rs`          | 在 `invoke_handler` 注册 + 添加 `#[tauri::command]` 函数 |
 | HTTP 逻辑    | `src/http/mod.rs`     | reqwest 发送 + tokio 取消机制                            |
-| 数据库操作   | `src/database/mod.rs` | SQLite schema + CRUD                                     |
+| 数据库操作   | `src/database/mod.rs` | SQLite schema + CRUD + 连接池                            |
 | 数据模型     | `src/models/mod.rs`   | 前后端共享的数据结构                                     |
 | 错误处理     | `src/error.rs`        | IApiError + thiserror                                    |
 | cURL 解析    | `src/curl/mod.rs`     | cURL 命令 → HttpRequest                                  |
@@ -63,13 +66,17 @@ async fn command_name(
 - rusqlite (bundled SQLite)
 - `Arc<Database>` 通过 Tauri State 共享
 - schema 在 `database/mod.rs` 初始化
+- 每个连接启用 `PRAGMA foreign_keys = ON` + WAL 模式
+- 连接池大小: 10
 
 ## ANTI-PATTERNS
 
 - **禁止** 在 command 中 panic (使用 Result)
+- **禁止** HTTP 响应缓存 — API 测试工具必须每次发送真实请求
 - **避免** 阻塞主线程 (使用 async/await)
 - **注意** SQLite 连接不是线程安全的，必须使用 Arc 包装
 - **注意** 前端调用是异步的，command 必须是 async
+- **注意** 序列化失败应返回错误，不可 `unwrap_or_default()` 静默处理
 
 ## DEPENDENCIES
 

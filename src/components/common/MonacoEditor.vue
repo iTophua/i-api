@@ -4,22 +4,27 @@ import * as monaco from 'monaco-editor'
 import type { Language } from '@/composables/useMonacoEditor'
 import { useSettingsStore } from '@/stores'
 
-const props = withDefaults(defineProps<{
-  modelValue: string
-  language?: Language
-  readOnly?: boolean
-  minimap?: boolean
-  lineNumbers?: boolean
-  wordWrap?: 'on' | 'off'
-  height?: string
-}>(), {
-  language: 'plaintext',
-  readOnly: false,
-  minimap: false,
-  lineNumbers: true,
-  wordWrap: 'on',
-  height: '100%',
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    language?: Language
+    readOnly?: boolean
+    minimap?: boolean
+    lineNumbers?: boolean
+    wordWrap?: 'on' | 'off'
+    height?: string
+    enablePerformanceOptimization?: boolean
+  }>(),
+  {
+    language: 'plaintext',
+    readOnly: false,
+    minimap: false,
+    lineNumbers: true,
+    wordWrap: 'on',
+    height: '100%',
+    enablePerformanceOptimization: true,
+  }
+)
 
 const settingsStore = useSettingsStore()
 
@@ -195,20 +200,26 @@ onUnmounted(() => {
   disposeEditor()
 })
 
-watch(() => props.modelValue, (newValue) => {
-  if (editor && editor.getValue() !== newValue) {
-    editor.setValue(newValue)
-  }
-})
-
-watch(() => props.language, (newLang) => {
-  if (editor) {
-    const model = editor.getModel()
-    if (model) {
-      monaco.editor.setModelLanguage(model, newLang)
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (editor && editor.getValue() !== newValue) {
+      editor.setValue(newValue)
     }
   }
-})
+)
+
+watch(
+  () => props.language,
+  (newLang) => {
+    if (editor) {
+      const model = editor.getModel()
+      if (model) {
+        monaco.editor.setModelLanguage(model, newLang)
+      }
+    }
+  }
+)
 
 watch(isDark, (dark) => {
   if (editor) {
@@ -226,7 +237,8 @@ function format() {
       const value = editor.getValue()
       const parsed = JSON.parse(value)
       editor.setValue(JSON.stringify(parsed, null, 2))
-    } catch {
+    } catch (e) {
+      console.warn('格式化失败:', e)
     }
   }
 }

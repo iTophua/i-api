@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { NTabs, NTabPane, NButton, NIcon, NInput, NScrollbar, NTag, NTooltip } from 'naive-ui'
+import { NTabs, NTabPane, NButton, NIcon, NInput, NTag, NTooltip } from 'naive-ui'
 import {
-  AddOutline,
-  FolderOutline,
-  TimeOutline,
   TrashOutline,
-  SearchOutline,
-  EarthOutline,
-  CreateOutline,
   ChevronBackOutline,
   ChevronForwardOutline,
+  CreateOutline,
 } from '@vicons/ionicons5'
 import { ref, computed, nextTick } from 'vue'
-import { useRequestStore, useHistoryStore, useEnvironmentStore } from '@/stores'
+import { useRequestStore, useEnvironmentStore } from '@/stores'
 import { useI18n } from '@/composables/useI18n'
-import type { Request, History, Environment } from '@/types'
+import type { Request, HttpMethod, History as RequestHistory } from '@/types'
+
+const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
+
+function isValidHttpMethod(method: string): method is HttpMethod {
+  return HTTP_METHODS.includes(method as HttpMethod)
+}
+import { HttpMethodIcon, AppIcon } from '@/components/icons'
+import BatchOperationToolbar from '@/components/common/BatchOperationToolbar.vue'
+import BatchMoveDialog from '@/components/common/BatchMoveDialog.vue'
+import HistoryPanel from '@/components/history/HistoryPanel.vue'
+import EnvironmentManager from '@/components/environment/EnvironmentManager.vue'
 
 defineProps<{
   collapsed?: boolean
@@ -30,7 +36,6 @@ const emit = defineEmits<{
 }>()
 
 const requestStore = useRequestStore()
-const historyStore = useHistoryStore()
 const environmentStore = useEnvironmentStore()
 const { t } = useI18n()
 
@@ -41,19 +46,8 @@ const editingId = ref<string | null>(null)
 const editingName = ref('')
 const editingType = ref<'collection' | 'environment' | 'request' | null>(null)
 
-const methodTypes: Record<string, 'success' | 'info' | 'warning' | 'error' | 'primary'> = {
-  GET: 'info',
-  POST: 'success',
-  PUT: 'warning',
-  DELETE: 'error',
-  PATCH: 'primary',
-  OPTIONS: 'info',
-  HEAD: 'info',
-}
-
-function getMethodType(method: string): 'success' | 'info' | 'warning' | 'error' | 'primary' {
-  return methodTypes[method] || 'info'
-}
+const showBatchDialog = ref(false)
+const batchMode = ref<'copy' | 'move'>('move')
 
 function toggleExpand(key: string) {
   if (expandedKeys.value.has(key)) {
@@ -63,31 +57,39 @@ function toggleExpand(key: string) {
   }
 }
 
-function selectRequest(request: Request, collectionId?: string) {
-  requestStore.openRequest(request, collectionId)
+function toggleRequestSelection(requestId: string) {
+  requestStore.toggleSelection(requestId)
 }
 
-function selectHistory(history: History) {
+function selectRequest(request: Request, collectionId?: string) {
+  if (requestStore.isSelectionMode) {
+    toggleRequestSelection(request.id)
+  } else {
+    requestStore.openRequest(request, collectionId)
+  }
+}
+
+function selectHistory(history: RequestHistory) {
+  const now = new Date().toISOString()
   requestStore.openRequest(
     {
       id: crypto.randomUUID(),
       name: `${history.method} ${history.url}`,
-      method: history.method as any,
+      description: '',
+      method: isValidHttpMethod(history.method) ? history.method : 'GET',
       url: history.url,
       params: [],
       headers: [],
       body: { mode: 'none' },
       auth: { type: 'none' },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      preScript: '',
+      postScript: '',
+      createdAt: now,
+      updatedAt: now,
     },
     undefined,
     true
   )
-}
-
-function selectEnvironment(env: Environment) {
-  environmentStore.setCurrentEnvironment(env.id)
 }
 
 function handleNewCollection() {
@@ -112,34 +114,12 @@ const filteredCollections = computed(() => {
   )
 })
 
-const filteredHistories = computed(() => {
-  if (!searchQuery.value) return historyStore.histories.slice(0, 50)
-  const query = searchQuery.value.toLowerCase()
-  return historyStore.histories
-    .filter((h) => h.url.toLowerCase().includes(query) || h.method.toLowerCase().includes(query))
-    .slice(0, 50)
-})
-
-const filteredEnvironments = computed(() => {
-  if (!searchQuery.value) return environmentStore.environments
-  const query = searchQuery.value.toLowerCase()
-  return environmentStore.environments.filter((e) => e.name.toLowerCase().includes(query))
-})
-
 function deleteCollection(id: string) {
   requestStore.deleteCollection(id)
 }
 
 function deleteRequest(collectionId: string, requestId: string) {
   requestStore.deleteRequest(collectionId, requestId)
-}
-
-function deleteHistory(id: string) {
-  historyStore.deleteHistory(id)
-}
-
-async function deleteEnvironment(id: string) {
-  await environmentStore.deleteEnvironment(id)
 }
 
 function isRequestActive(requestId: string): boolean {
@@ -181,6 +161,21 @@ function cancelRename() {
 function handleToggle() {
   emit('toggle')
 }
+
+function openBatchDialog(mode: 'copy' | 'move') {
+  batchMode.value = mode
+  showBatchDialog.value = true
+}
+
+function closeBatchDialog() {
+  showBatchDialog.value = false
+}
+
+function getCurrentCollectionId(): string | undefined {
+  const currentTab = requestStore.currentTab
+  if (!currentTab?.collectionId) return undefined
+  return currentTab.collectionId
+}
 </script>
 
 <template>
@@ -190,7 +185,7 @@ function handleToggle() {
         <NTabPane name="collections">
           <template #tab>
             <span class="tab-label">
-              <NIcon :component="FolderOutline" />
+              <AppIcon type="collection" :size="16" />
               {{ t('collection.collections') }}
             </span>
           </template>
@@ -198,7 +193,7 @@ function handleToggle() {
         <NTabPane name="history">
           <template #tab>
             <span class="tab-label">
-              <NIcon :component="TimeOutline" />
+              <AppIcon type="history" :size="16" />
               {{ t('history.history') }}
             </span>
           </template>
@@ -206,7 +201,7 @@ function handleToggle() {
         <NTabPane name="environments">
           <template #tab>
             <span class="tab-label">
-              <NIcon :component="EarthOutline" />
+              <AppIcon type="environment" :size="16" />
               {{ t('environment.environments') }}
             </span>
           </template>
@@ -223,7 +218,7 @@ function handleToggle() {
         class="search-input"
       >
         <template #prefix>
-          <NIcon :component="SearchOutline" />
+          <AppIcon type="search" :size="14" />
         </template>
       </NInput>
       <NButton
@@ -239,17 +234,23 @@ function handleToggle() {
         "
       >
         <template #icon>
-          <NIcon :component="AddOutline" />
+          <AppIcon type="plus" :size="14" />
         </template>
       </NButton>
     </div>
 
-    <NScrollbar class="sidebar-scroll">
+    <div class="sidebar-content">
+      <!-- Collections Tab -->
       <div v-if="activeTab === 'collections'" class="list-container">
+        <BatchOperationToolbar
+          :collection="filteredCollections[0]"
+          @copy="openBatchDialog('copy')"
+          @move="openBatchDialog('move')"
+        />
         <template v-for="collection in filteredCollections" :key="collection.id">
           <div class="list-item group" @click="toggleExpand(collection.id)">
             <div class="item-content">
-              <NIcon :component="FolderOutline" class="item-icon" />
+              <AppIcon type="folder" :size="16" class="item-icon" />
               <template v-if="editingId === collection.id && editingType === 'collection'">
                 <input
                   v-model="editingName"
@@ -273,7 +274,7 @@ function handleToggle() {
                 class="action-btn"
                 @click.stop="startRename(collection.id, collection.name, 'collection')"
               >
-                <NIcon :component="CreateOutline" />
+                <AppIcon type="edit" :size="12" />
               </NButton>
               <NButton
                 text
@@ -281,7 +282,7 @@ function handleToggle() {
                 class="action-btn"
                 @click.stop="deleteCollection(collection.id)"
               >
-                <NIcon :component="TrashOutline" />
+                <AppIcon type="trash" :size="12" />
               </NButton>
             </div>
           </div>
@@ -290,12 +291,23 @@ function handleToggle() {
               v-for="request in collection.requests"
               :key="request.id"
               class="list-item request-item"
-              :class="{ active: isRequestActive(request.id) }"
+              :class="{
+                active: isRequestActive(request.id),
+                selected: requestStore.isInSelection(request.id),
+              }"
               @click="selectRequest(request, collection.id)"
             >
-              <NTag :type="getMethodType(request.method)" size="small">
-                {{ request.method }}
-              </NTag>
+              <div
+                v-if="requestStore.isSelectionMode"
+                class="selection-checkbox"
+                @click.stop="toggleRequestSelection(request.id)"
+              >
+                <AppIcon
+                  :type="requestStore.isInSelection(request.id) ? 'check' : 'plus'"
+                  :size="14"
+                />
+              </div>
+              <HttpMethodIcon :method="request.method" :size="12" filled />
               <template v-if="editingId === request.id && editingType === 'request'">
                 <input
                   v-model="editingName"
@@ -336,81 +348,16 @@ function handleToggle() {
         </div>
       </div>
 
-      <div v-if="activeTab === 'history'" class="list-container">
-        <div
-          v-for="history in filteredHistories"
-          :key="history.id"
-          class="list-item history-item"
-          @click="selectHistory(history)"
-        >
-          <NTag :type="getMethodType(history.method)" size="small">
-            {{ history.method }}
-          </NTag>
-          <div class="history-info">
-            <span class="history-url">{{ history.url }}</span>
-            <span class="history-meta">
-              <NTag :type="history.status < 400 ? 'success' : 'error'" size="small">
-                {{ history.status }}
-              </NTag>
-              <span class="time">{{ history.responseTime }}ms</span>
-            </span>
-          </div>
-          <NButton text size="tiny" class="delete-btn" @click.stop="deleteHistory(history.id)">
-            <NIcon :component="TrashOutline" />
-          </NButton>
-        </div>
-        <div v-if="filteredHistories.length === 0" class="empty-state">
-          {{ t('history.noHistory') }}
-        </div>
+      <!-- History Tab -->
+      <div v-if="activeTab === 'history'" class="history-tab-container">
+        <HistoryPanel @select="selectHistory" />
       </div>
 
-      <div v-if="activeTab === 'environments'" class="list-container">
-        <div
-          v-for="env in filteredEnvironments"
-          :key="env.id"
-          class="list-item env-item"
-          :class="{ active: environmentStore.currentEnvironmentId === env.id }"
-          @click="selectEnvironment(env)"
-        >
-          <div class="item-content">
-            <NIcon :component="EarthOutline" class="item-icon" />
-            <template v-if="editingId === env.id && editingType === 'environment'">
-              <input
-                v-model="editingName"
-                :class="`rename-input-${env.id}`"
-                class="rename-input"
-                @blur="finishRename"
-                @keyup.enter="finishRename"
-                @keyup.escape="cancelRename"
-                @click.stop
-              />
-            </template>
-            <template v-else>
-              <span class="item-name">{{ env.name }}</span>
-              <NTag size="small" :bordered="false"
-                >{{ env.variables.length }} {{ t('environment.variables') }}</NTag
-              >
-            </template>
-          </div>
-          <div class="action-buttons">
-            <NButton
-              text
-              size="tiny"
-              class="action-btn"
-              @click.stop="startRename(env.id, env.name, 'environment')"
-            >
-              <NIcon :component="CreateOutline" />
-            </NButton>
-            <NButton text size="tiny" class="action-btn" @click.stop="deleteEnvironment(env.id)">
-              <NIcon :component="TrashOutline" />
-            </NButton>
-          </div>
-        </div>
-        <div v-if="filteredEnvironments.length === 0" class="empty-state">
-          {{ t('environment.noEnvironment') }}
-        </div>
+      <!-- Environments Tab -->
+      <div v-if="activeTab === 'environments'" class="env-tab-container">
+        <EnvironmentManager />
       </div>
-    </NScrollbar>
+    </div>
 
     <div class="sidebar-footer">
       <div class="sidebar-logo">
@@ -437,6 +384,14 @@ function handleToggle() {
         {{ collapsed ? t('common.expand') : t('common.collapse') }}
       </NTooltip>
     </div>
+
+    <BatchMoveDialog
+      v-model:show="showBatchDialog"
+      :collection-id="getCurrentCollectionId()"
+      :request-ids="Array.from(requestStore.selectedRequestIds)"
+      :mode="batchMode"
+      @close="closeBatchDialog"
+    />
   </div>
 </template>
 
@@ -447,7 +402,23 @@ function handleToggle() {
   flex-direction: column;
   position: relative;
   background: var(--n-color);
-  border-right: 1px solid var(--n-border-color);
+}
+
+.sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--n-border-color);
+  pointer-events: none;
+}
+
+.sidebar-content,
+.sidebar-scroll {
+  position: relative;
+  z-index: 1;
 }
 
 .sidebar.collapsed {
@@ -458,8 +429,11 @@ function handleToggle() {
 .sidebar.collapsed .sidebar-tabs,
 .sidebar.collapsed .sidebar-search-row,
 .sidebar.collapsed .sidebar-scroll,
+.sidebar.collapsed .sidebar-content,
 .sidebar.collapsed .list-container,
-.sidebar.collapsed .empty-state {
+.sidebar.collapsed .empty-state,
+.sidebar.collapsed .history-tab-container,
+.sidebar.collapsed .env-tab-container {
   display: none;
 }
 
@@ -499,8 +473,29 @@ function handleToggle() {
   overflow: hidden;
 }
 
+.sidebar-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
 .list-container {
+  height: 100%;
+  overflow-y: auto;
   padding: 4px;
+}
+
+.history-tab-container,
+.env-tab-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .list-item {
@@ -522,6 +517,27 @@ function handleToggle() {
 .list-item.active {
   background: var(--n-color-hover);
   box-shadow: inset 3px 0 0 var(--n-primary-color);
+}
+
+.list-item.selected {
+  background: var(--n-color-hover);
+  box-shadow: inset 3px 0 0 var(--n-primary-color);
+}
+
+.selection-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selection-checkbox:hover {
+  background: var(--n-color-pressed);
 }
 
 .item-content {
@@ -745,5 +761,19 @@ function handleToggle() {
   .logo-text {
     font-size: 14px;
   }
+}
+
+.history-tab-container {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.env-tab-container {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 </style>

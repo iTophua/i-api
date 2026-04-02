@@ -1,5 +1,6 @@
 use crate::models::{HttpRequest, HttpResponse, KeyValuePair};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use futures_util::StreamExt;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use std::collections::HashMap;
@@ -47,11 +48,9 @@ static PENDING_REQUESTS: Lazy<Arc<RwLock<HashMap<String, tokio_util::sync::Cance
 
 pub async fn send_request(request: HttpRequest) -> Result<HttpResponse, String> {
     let client = if let Some(timeout_ms) = request.timeout {
-        let timeout_secs = timeout_ms / 1000;
-        let timeout_nanos = (timeout_ms % 1000) * 1_000_000;
         Arc::new(
             Client::builder()
-                .timeout(Duration::new(timeout_secs, timeout_nanos as u32))
+                .timeout(Duration::from_millis(timeout_ms))
                 .connect_timeout(Duration::from_secs(10))
                 .pool_max_idle_per_host(10)
                 .pool_idle_timeout(Duration::from_secs(90))
@@ -152,6 +151,121 @@ pub async fn cancel_request(request_id: &str) -> bool {
         true
     } else {
         false
+    }
+}
+
+// 流式响应处理
+pub async fn send_request_stream<F>(
+    request: HttpRequest,
+    mut on_chunk: F,
+) -> Result<(String, HashMap<String, String>, u16, u64, usize), String>
+where
+    F: FnMut(Vec<u8>, HashMap<String, String>, u16, std::time::Instant) + Send + 'static,
+{
+    let client = if let Some(timeout_ms) = request.timeout {
+        Arc::new(
+            Client::builder()
+                .timeout(Duration::from_millis(timeout_ms))
+                .connect_timeout(Duration::from_secs(10))
+                .pool_max_idle_per_host(10)
+                .pool_idle_timeout(Duration::from_secs(90))
+                .user_agent("iApi/0.1.0")
+                .build()
+                .map_err(|e| format!("创建 HTTP 客户端失败：{}", e))?,
+        )
+    } else {
+        HTTP_CLIENT.clone()
+    };
+
+    let request_id = request.id.clone();
+    let cancellation_token = tokio_util::sync::CancellationToken::new();
+    {
+        let mut pending = PENDING_REQUESTS.write().await;
+        pending.insert(request_id.clone(), cancellation_token.clone());
+    }
+
+    let result = send_request_stream_internal(client, request, cancellation_token, on_chunk).await;
+
+    {
+        let mut pending = PENDING_REQUESTS.write().await;
+        pending.remove(&request_id);
+    }
+
+    result
+}
+
+async fn send_request_stream_internal<F>(
+    client: Arc<Client>,
+    request: HttpRequest,
+    cancellation_token: tokio_util::sync::CancellationToken,
+    mut on_chunk: F,
+) -> Result<(String, HashMap<String, String>, u16, u64, usize), String>
+where
+    F: FnMut(Vec<u8>, HashMap<String, String>, u16, std::time::Instant) + Send + 'static,
+{
+    let url = build_url_with_auth(&request.url, &request.params, &request.auth);
+    let method = parse_method(&request.method);
+
+    let mut req_builder = client.request(method, &url);
+    let is_form_data = request.body.as_ref()
+        .map(|b| b.body_mode == "form-data")
+        .unwrap_or(false);
+
+    req_builder = add_headers(req_builder, &request.headers, &request.auth, is_form_data);
+    req_builder = add_body(req_builder, &request.body).await;
+
+    let start = Instant::now();
+
+    tokio::select! {
+        result = req_builder.send() => {
+            let response = result.map_err(|e| e.to_string())?;
+
+            let status = response.status().as_u16();
+            let status_text = response.status().canonical_reason().unwrap_or("").to_string();
+
+            let headers: HashMap<String, String> = response
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+                .collect();
+
+            // 发送响应头通知
+            on_chunk(Vec::new(), headers.clone(), status, start);
+
+            let cookies = extract_cookies(&headers);
+            let return_bytes = request.return_bytes.unwrap_or(false);
+
+            let mut full_body = String::new();
+            let mut total_size = 0usize;
+            let mut stream = response.bytes_stream();
+
+            while let Some(chunk_result) = stream.next().await {
+                let chunk = chunk_result.map_err(|e| e.to_string())?;
+                let chunk_vec = chunk.to_vec();
+                total_size += chunk_vec.len();
+
+                if !return_bytes {
+                    if let Ok(text) = std::str::from_utf8(&chunk_vec) {
+                        full_body.push_str(text);
+                    }
+                }
+
+                // 每 8KB 发送一次块事件
+                if total_size % 8192 < chunk_vec.len() || chunk_vec.len() >= 8192 {
+                    on_chunk(chunk_vec, headers.clone(), status, start);
+                }
+            }
+
+            // 发送结束标记
+            on_chunk(Vec::new(), headers.clone(), status, start);
+
+            let response_time = start.elapsed().as_millis() as u64;
+
+            Ok((full_body, headers, status, response_time, total_size))
+        }
+        _ = cancellation_token.cancelled() => {
+            Err("请求已取消".to_string())
+        }
     }
 }
 

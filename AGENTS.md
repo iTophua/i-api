@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-03-31
+**Generated:** 2026-04-02
 **Project:** iApi - 轻量、快速、中文的 API 测试工具
 
 ## OVERVIEW
@@ -12,10 +12,10 @@ Tauri 2.x 桌面应用。前端 Vue 3 + TypeScript + Vite，后端 Rust。类 Po
 ```
 i-api/
 ├── src/                    # 前端源码 (Vue 3 + TS)
-│   ├── components/         # 按功能模块: common, request, response, sidebar
-│   ├── stores/             # Pinia: request, settings, environment, history
-│   ├── composables/        # useI18n, useMonacoEditor, useSecretStorage, useShortcuts
-│   ├── views/              # HomeView, SplashView
+│   ├── components/         # 按功能模块: common(16), request(6), response(4), sidebar(1), environment(4), history(5), icons(5)
+│   ├── stores/             # Pinia: request(750行), settings, environment, history
+│   ├── composables/        # 7个: useI18n, useMonacoEditor, useSecretStorage, useShortcuts, useEditorOptimizer, useStreamedRequest, useTabDrag
+│   ├── views/              # HomeView(708行), SplashView
 │   ├── router/             # Vue Router 配置
 │   ├── types/              # 核心类型定义 + normalize 函数
 │   ├── utils/              # codeGenerator (esbuild)
@@ -24,7 +24,7 @@ i-api/
 │   └── src/
 │       ├── lib.rs          # Tauri command 注册 (30+ commands)
 │       ├── http/           # HTTP 请求发送 + 取消
-│       ├── database/       # SQLite (rusqlite)
+│       ├── database/       # SQLite (rusqlite) + 连接池 + 优化器
 │       ├── models/         # 数据模型
 │       ├── curl/           # cURL 解析
 │       ├── openapi/        # OpenAPI/HAR 导入
@@ -38,16 +38,16 @@ i-api/
 
 ## WHERE TO LOOK
 
-| 任务       | 位置                              | 说明                             |
-| ---------- | --------------------------------- | -------------------------------- |
-| 前端组件   | `src/components/`                 | request/ 最复杂 (6个组件)        |
-| 状态管理   | `src/stores/`                     | 4 个 Pinia store                 |
-| 类型定义   | `src/types/index.ts`              | 292行，含 normalize/convert 函数 |
-| Tauri 命令 | `src-tauri/src/lib.rs`            | 所有前端调用的后端入口           |
-| HTTP 逻辑  | `src-tauri/src/http/`             | 请求发送、取消、响应处理         |
-| 数据库     | `src-tauri/src/database/`         | SQLite schema + CRUD             |
-| 国际化     | `src/locales/`                    | zh-CN / en-US                    |
-| 快捷键     | `src/composables/useShortcuts.ts` | 默认快捷键配置                   |
+| 任务       | 位置                              | 说明                          |
+| ---------- | --------------------------------- | ----------------------------- |
+| 前端组件   | `src/components/`                 | request/ 最复杂 (6个组件)     |
+| 状态管理   | `src/stores/`                     | 4 个 Pinia store              |
+| 类型定义   | `src/types/index.ts`              | 含 normalize/convert 函数     |
+| Tauri 命令 | `src-tauri/src/lib.rs`            | 所有前端调用的后端入口        |
+| HTTP 逻辑  | `src-tauri/src/http/`             | 请求发送、取消、响应处理      |
+| 数据库     | `src-tauri/src/database/`         | SQLite schema + CRUD + 连接池 |
+| 国际化     | `src/locales/`                    | zh-CN / en-US                 |
+| 快捷键     | `src/composables/useShortcuts.ts` | 默认快捷键配置                |
 
 ## CONVENTIONS
 
@@ -76,7 +76,8 @@ i-api/
 
 - **禁止** `as any`、`@ts-ignore` — 使用严格类型
 - **禁止** 空 catch 块
-- **避免** `console.log` 残留 (types/index.ts 有 2 处调试日志)
+- **禁止** HTTP 响应缓存 — API 测试工具必须每次发送真实请求
+- **避免** `console.log` 残留
 - **注意** typecheck 回退: CI 中 `npm run typecheck || npm run build` 可能隐藏类型错误
 - **注意** E2E 静默失败: CI 中 `npm run test:e2e || true`
 
@@ -108,3 +109,4 @@ npm run format           # Prettier 格式化
 - 包管理: pnpm (检测到 pnpm-lock.yaml)
 - 覆盖率阈值: 语句/分支/函数/行 ≥ 80%
 - Tauri 特性: devtools 启用
+- 数据库: SQLite WAL 模式 + 外键约束 + 连接池(10)

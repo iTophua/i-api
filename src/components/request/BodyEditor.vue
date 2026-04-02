@@ -27,10 +27,6 @@ const emit = defineEmits<{
 
 const safeBody = computed<RequestBody>(() => {
   const body = props.body ?? { mode: 'none' }
-  console.log('BodyEditor - props.body:', JSON.stringify(props.body, null, 2))
-  console.log('BodyEditor - safeBody:', JSON.stringify(body, null, 2))
-  console.log('BodyEditor - bodyMode:', body.mode)
-  console.log('BodyEditor - rawContent:', body.raw)
   return body
 })
 
@@ -298,7 +294,7 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
       <div v-else-if="bodyMode === 'raw'" class="content-section">
         <div class="editor-wrapper">
           <MonacoEditor
-            v-if="MonacoEditor"
+            v-if="MonacoEditor.value"
             v-model="rawContent"
             :language="editorLanguage"
             height="100%"

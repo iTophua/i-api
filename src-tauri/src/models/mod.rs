@@ -103,6 +103,10 @@ pub struct HttpRequest {
     pub return_bytes: Option<bool>,
     #[serde(default)]
     pub timeout: Option<u64>,
+    #[serde(default)]
+    pub collection_id: Option<String>,
+    #[serde(default)]
+    pub folder_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -155,6 +159,8 @@ impl HttpRequest {
             post_script: None,
             return_bytes: None,
             timeout: None,
+            collection_id: None,
+            folder_id: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -182,6 +188,8 @@ impl HttpRequest {
             post_script: None,
             return_bytes: None,
             timeout: None,
+            collection_id: None,
+            folder_id: None,
             created_at: now.clone(),
             updated_at: now,
         }

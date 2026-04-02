@@ -396,7 +396,7 @@ fn parse_multipart_body(body: &str, boundary: &str) -> Vec<crate::models::FormDa
 
     // multipart 格式: --boundary\r\nContent-Disposition: form-data; name="xxx"\r\n\r\nvalue\r\n--boundary--
     // 按 boundary 分割
-    let delimiter = format!("--{}", boundary);
+    let delimiter = format!("--{}", boundary.trim());
     let parts: Vec<&str> = body.split(&delimiter).collect();
 
     for part in parts {

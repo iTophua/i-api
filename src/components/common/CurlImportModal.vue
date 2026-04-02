@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [show: boolean]
-  'import': [request: Request]
+  import: [request: Request]
 }>()
 
 const curlCommand = ref('')
@@ -27,20 +27,14 @@ async function handleImport() {
   error.value = ''
 
   try {
-    console.log('=== CurlImportModal - 开始解析 cURL ===')
-    console.log('cURL 命令:', curlCommand.value)
-    
     const request = await invoke<Request>('parse_curl_command', {
       curl: curlCommand.value,
     })
-    
-    console.log('解析结果:', JSON.stringify(request, null, 2))
-    
+
     await invoke('save_temporary_request', { request })
     emit('import', request)
     handleClose()
   } catch (e) {
-    console.error('解析错误:', e)
     error.value = String(e)
   } finally {
     isLoading.value = false
@@ -75,9 +69,7 @@ curl 'https://api.example.com/users' \
       <template #footer>
         <NSpace justify="end">
           <NButton @click="handleClose">取消</NButton>
-          <NButton type="primary" :loading="isLoading" @click="handleImport">
-            导入
-          </NButton>
+          <NButton type="primary" :loading="isLoading" @click="handleImport"> 导入 </NButton>
         </NSpace>
       </template>
     </NCard>

@@ -1,0 +1,570 @@
+/* iApi 品牌色彩系统 */
+/* https://www.figma.com/design/xxxxx/iApi-Design-System */
+
+:root {
+  /* ===== 品牌主色 ===== */
+  /* 主色 - 蓝色，代表专业、可靠 */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  /* ===== 功能色 ===== */
+  /* 成功色 - 绿色 */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+  --color-success-900: #064e3b;
+
+  /* 警告色 - 橙色 */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
+  /* 错误色 - 红色 */
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-200: #fecaca;
+  --color-error-300: #fca5a5;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+  --color-error-800: #991b1b;
+  --color-error-900: #7f1d1d;
+
+  /* 信息色 - 蓝色 */
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-300: #93c5fd;
+  --color-info-400: #60a5fa;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+  --color-info-800: #1e40af;
+  --color-info-900: #1e3a8a;
+
+  /* ===== 中性色 ===== */
+  /* 文本颜色 */
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-text-disabled: #d1d5db;
+
+  /* 背景颜色 */
+  --color-bg-base: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-bg-elevated: #ffffff;
+
+  /* 边框颜色 */
+  --color-border: #e5e7eb;
+  --color-border-secondary: #f3f4f6;
+  --color-border-focus: #3b82f6;
+
+  /* ===== 语义化颜色映射 ===== */
+  --color-brand: var(--color-primary-500);
+  --color-brand-hover: var(--color-primary-600);
+  --color-brand-active: var(--color-primary-700);
+  --color-brand-light: var(--color-primary-50);
+
+  /* ===== 请求方法颜色 ===== */
+  --color-method-get: #10b981;
+  --color-method-get-bg: rgba(16, 185, 129, 0.1);
+  --color-method-post: #3b82f6;
+  --color-method-post-bg: rgba(59, 130, 246, 0.1);
+  --color-method-put: #f59e0b;
+  --color-method-put-bg: rgba(245, 158, 11, 0.1);
+  --color-method-delete: #ef4444;
+  --color-method-delete-bg: rgba(239, 68, 68, 0.1);
+  --color-method-patch: #8b5cf6;
+  --color-method-patch-bg: rgba(139, 92, 246, 0.1);
+  --color-method-head: #06b6d4;
+  --color-method-head-bg: rgba(6, 182, 212, 0.1);
+  --color-method-options: #ec4899;
+  --color-method-options-bg: rgba(236, 72, 153, 0.1);
+
+  /* ===== 响应状态码颜色 ===== */
+  --color-status-success: #10b981;
+  --color-status-success-bg: rgba(16, 185, 129, 0.1);
+  --color-status-redirect: #3b82f6;
+  --color-status-redirect-bg: rgba(59, 130, 246, 0.1);
+  --color-status-client-error: #f59e0b;
+  --color-status-client-error-bg: rgba(245, 158, 11, 0.1);
+  --color-status-server-error: #ef4444;
+  --color-status-server-error-bg: rgba(239, 68, 68, 0.1);
+
+  /* ===== 间距系统 ===== */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
+
+  /* ===== 圆角系统 ===== */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* ===== 阴影系统 ===== */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  /* ===== 层级系统 ===== */
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-modal-mask: 1500;
+  --z-modal: 2000;
+  --z-toast: 3000;
+  --z-tooltip: 4000;
+
+  /* ===== 过渡动画 ===== */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+  --transition-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ===== 动画关键帧 ===== */
+  --animation-fade-in: fade-in 0.2s ease-out;
+  --animation-fade-out: fade-out 0.15s ease-in;
+  --animation-slide-up: slide-up 0.2s ease-out;
+  --animation-slide-down: slide-down 0.2s ease-out;
+  --animation-scale-in: scale-in 0.15s ease-out;
+  --animation-shake: shake 0.4s ease-in-out;
+  --animation-pulse: pulse 2s ease-in-out infinite;
+
+  /* ===== 字体系统 ===== */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  --font-family-mono: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.75;
+}
+
+/* ===== 暗色主题 ===== */
+[data-theme='dark'] {
+  /* 文本颜色 */
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  --color-text-disabled: #6b7280;
+
+  /* 背景颜色 */
+  --color-bg-base: #1a1a1a;
+  --color-bg-secondary: #262626;
+  --color-bg-tertiary: #333333;
+  --color-bg-elevated: #262626;
+
+  /* 边框颜色 */
+  --color-border: #404040;
+  --color-border-secondary: #333333;
+  --color-border-focus: #60a5fa;
+
+  /* 调整部分颜色的暗色模式表现 */
+  --color-brand-light: rgba(59, 130, 246, 0.15);
+}
+
+/* ===== 工具类 ===== */
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-brand {
+  color: var(--color-brand);
+}
+
+.text-success {
+  color: var(--color-success-500);
+}
+
+.text-warning {
+  color: var(--color-warning-500);
+}
+
+.text-error {
+  color: var(--color-error-500);
+}
+
+.bg-brand {
+  background-color: var(--color-brand);
+}
+
+.bg-brand-light {
+  background-color: var(--color-brand-light);
+}
+
+.bg-success {
+  background-color: var(--color-success-500);
+}
+
+.bg-warning {
+  background-color: var(--color-warning-500);
+}
+
+.bg-error {
+  background-color: var(--color-error-500);
+}
+
+.border-brand {
+  border-color: var(--color-brand);
+}
+
+/* 请求方法标签样式 */
+.method-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.method-tag.get {
+  background-color: var(--color-method-get-bg);
+  color: var(--color-method-get);
+}
+
+.method-tag.post {
+  background-color: var(--color-method-post-bg);
+  color: var(--color-method-post);
+}
+
+.method-tag.put {
+  background-color: var(--color-method-put-bg);
+  color: var(--color-method-put);
+}
+
+.method-tag.delete {
+  background-color: var(--color-method-delete-bg);
+  color: var(--color-method-delete);
+}
+
+.method-tag.patch {
+  background-color: var(--color-method-patch-bg);
+  color: var(--color-method-patch);
+}
+
+.method-tag.head {
+  background-color: var(--color-method-head-bg);
+  color: var(--color-method-head);
+}
+
+.method-tag.options {
+  background-color: var(--color-method-options-bg);
+  color: var(--color-method-options);
+}
+
+/* 响应状态标签样式 */
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.status-tag.success {
+  background-color: var(--color-status-success-bg);
+  color: var(--color-status-success);
+}
+
+.status-tag.redirect {
+  background-color: var(--color-status-redirect-bg);
+  color: var(--color-status-redirect);
+}
+
+.status-tag.client-error {
+  background-color: var(--color-status-client-error-bg);
+  color: var(--color-status-client-error);
+}
+
+.status-tag.server-error {
+  background-color: var(--color-status-server-error-bg);
+  color: var(--color-status-server-error);
+}
+
+/* ===== 动画关键帧 ===== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 动画工具类 ===== */
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-fade-out {
+  animation: fade-out 0.15s ease-in;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.15s ease-out;
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ===== 过渡效果工具类 ===== */
+.transition-base {
+  transition: var(--transition-base);
+}
+
+.transition-fast {
+  transition: var(--transition-fast);
+}
+
+.transition-slow {
+  transition: var(--transition-slow);
+}
+
+.transition-all {
+  transition: all var(--transition-base);
+}
+
+/* ===== 按钮交互效果 ===== */
+.btn-hover-effect {
+  transition: all var(--transition-fast);
+}
+
+.btn-hover-effect:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-hover-effect:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ===== 卡片悬浮效果 ===== */
+.card-hover-effect {
+  transition: all var(--transition-base);
+}
+
+.card-hover-effect:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ===== 输入框焦点效果 ===== */
+.input-focus-effect {
+  transition: all var(--transition-fast);
+}
+
+.input-focus-effect:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-light);
+}
+
+/* ===== 标签页切换效果 ===== */
+.tab-transition {
+  transition: all var(--transition-base);
+}
+
+/* ===== 模态框动画 ===== */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .modal-content,
+.modal-leave-active .modal-content {
+  transition: transform 0.2s ease;
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+  transform: scale(0.95);
+}
+
+/* ===== 下拉菜单动画 ===== */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ===== 列表项动画 ===== */
+.list-item-enter-active,
+.list-item-leave-active {
+  transition: all var(--transition-base);
+}
+
+.list-item-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.list-item-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+/* ===== 减少动画偏好 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

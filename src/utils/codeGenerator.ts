@@ -28,7 +28,8 @@ export function generateCode(request: Request, language: CodeLanguage): string {
 }
 
 function generateCurl(request: Request): string {
-  const lines: string[] = [`curl -X ${request.method} '${request.url}'`]
+  const url = JSON.stringify(request.url)
+  const lines: string[] = [`curl -X ${request.method} ${url}`]
 
   const enabledHeaders = request.headers.filter((h) => h.enabled)
   for (const header of enabledHeaders) {
@@ -59,12 +60,13 @@ function generateCurl(request: Request): string {
 }
 
 function generateAxios(request: Request): string {
+  const url = JSON.stringify(request.url)
   const lines: string[] = [
     `import axios from 'axios';`,
     '',
     `const response = await axios({`,
     `  method: '${request.method.toLowerCase()}',`,
-    `  url: '${request.url}',`,
+    `  url: ${url},`,
   ]
 
   const enabledHeaders = request.headers.filter((h) => h.enabled)
@@ -110,7 +112,8 @@ function generateFetch(request: Request): string {
     }
   }
 
-  lines.push(`const response = await fetch('${request.url}', {`)
+  const url = JSON.stringify(request.url)
+  lines.push(`const response = await fetch(${url}, {`)
   lines.push(`  ${options.join(',\n  ')}`)
   lines.push('});')
   lines.push('')
@@ -121,7 +124,8 @@ function generateFetch(request: Request): string {
 }
 
 function generatePython(request: Request): string {
-  const lines: string[] = [`import requests`, '', `url = '${request.url}'`]
+  const url = JSON.stringify(request.url)
+  const lines: string[] = [`import requests`, '', `url = ${url}`]
 
   const enabledHeaders = request.headers.filter((h) => h.enabled)
   if (enabledHeaders.length > 0) {
@@ -204,6 +208,7 @@ function generateJava(request: Request): string {
 }
 
 function generateGo(request: Request): string {
+  const url = JSON.stringify(request.url)
   const lines: string[] = [
     `package main`,
     '',
@@ -221,9 +226,9 @@ function generateGo(request: Request): string {
 
   if (request.body.mode === 'raw' && request.body.raw) {
     lines.push(`    body := strings.NewReader(\`${request.body.raw}\`)`)
-    lines.push(`    req, _ := http.NewRequest("${method}", "${request.url}", body)`)
+    lines.push(`    req, _ := http.NewRequest("${method}", ${url}, body)`)
   } else {
-    lines.push(`    req, _ := http.NewRequest("${method}", "${request.url}", nil)`)
+    lines.push(`    req, _ := http.NewRequest("${method}", ${url}, nil)`)
   }
 
   const enabledHeaders = request.headers.filter((h) => h.enabled)
