@@ -209,7 +209,7 @@ function getCurrentCollectionId(): string | undefined {
       </NTabs>
     </div>
 
-    <div class="sidebar-search-row">
+    <div v-if="activeTab !== 'history'" class="sidebar-search-row">
       <NInput
         v-model:value="searchQuery"
         :placeholder="t('common.search')"
@@ -228,9 +228,7 @@ function getCurrentCollectionId(): string | undefined {
         @click="
           activeTab === 'collections'
             ? handleNewCollection()
-            : activeTab === 'environments'
-              ? handleNewEnvironment()
-              : handleNewRequest()
+            : handleNewEnvironment()
         "
       >
         <template #icon>

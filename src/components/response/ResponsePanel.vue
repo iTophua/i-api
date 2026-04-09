@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NTabs, NTabPane, NButton, NIcon, NEmpty, NScrollbar, NTag } from 'naive-ui'
-import { CopyOutline, CodeOutline, DownloadOutline } from '@vicons/ionicons5'
+import { CopyOutline, CodeOutline } from '@vicons/ionicons5'
 import { computed, ref, shallowRef, onMounted } from 'vue'
 import { useRequestStore } from '@/stores'
 import { formatJsonString, detectLanguage } from '@/composables/useMonacoEditor'
@@ -78,18 +78,32 @@ const shouldUseLargeEditor = computed(() => {
   return lineCount > 1000 || content.length > 500000
 })
 
+const isFormatted = ref(false)
+
 function formatResponse() {
   if (responseLanguage.value === 'json' && responseContent.value) {
-    const formatted = formatJsonString(responseContent.value)
-    if (formatted !== responseContent.value && editorRef.value) {
-      editorRef.value.setValue(formatted)
+    if (isFormatted.value) {
+      // 压缩：移除多余空白
+      const compressed = responseContent.value.replace(/\s+/g, ' ').trim()
+      if (editorRef.value) {
+        editorRef.value.setValue(compressed)
+      }
+      isFormatted.value = false
+    } else {
+      // 美化
+      const formatted = formatJsonString(responseContent.value)
+      if (formatted !== responseContent.value && editorRef.value) {
+        editorRef.value.setValue(formatted)
+      }
+      isFormatted.value = true
     }
   }
 }
 
 function copyResponse() {
-  if (responseContent.value) {
-    navigator.clipboard.writeText(responseContent.value)
+  const contentToCopy = editorRef.value?.getValue?.() || responseContent.value
+  if (contentToCopy) {
+    navigator.clipboard.writeText(contentToCopy)
   }
 }
 
@@ -123,24 +137,7 @@ const testResults = computed(() => {
         </span>
       </div>
       <div class="status-actions">
-        <NButton v-if="responseLanguage === 'json'" text size="small" @click="formatResponse">
-          <template #icon>
-            <NIcon :component="CodeOutline" />
-          </template>
-          美化
-        </NButton>
-        <NButton text size="small" @click="copyResponse">
-          <template #icon>
-            <NIcon :component="CopyOutline" />
-          </template>
-          复制
-        </NButton>
-        <NButton text size="small">
-          <template #icon>
-            <NIcon :component="DownloadOutline" />
-          </template>
-          保存
-        </NButton>
+        <!-- 按钮已移动到 Body tab 中 -->
       </div>
     </div>
 
@@ -179,6 +176,20 @@ const testResults = computed(() => {
 
         <NTabPane name="body">
           <template #tab>Body</template>
+          <div class="body-actions">
+            <NButton v-if="responseLanguage === 'json'" text size="tiny" @click="formatResponse">
+              <template #icon>
+                <NIcon :component="CodeOutline" size="14" />
+              </template>
+              {{ isFormatted ? '压缩' : '美化' }}
+            </NButton>
+            <NButton text size="tiny" @click="copyResponse">
+              <template #icon>
+                <NIcon :component="CopyOutline" size="14" />
+              </template>
+              复制
+            </NButton>
+          </div>
           <div class="editor-wrapper">
             <LargeTextEditor
               v-if="shouldUseLargeEditor"
@@ -186,7 +197,7 @@ const testResults = computed(() => {
               :language="responseLanguage"
             />
             <MonacoEditor
-              v-else-if="MonacoEditor.value"
+              v-else-if="MonacoEditor"
               ref="editorRef"
               :model-value="formattedResponseContent"
               :language="responseLanguage"
@@ -209,12 +220,12 @@ const testResults = computed(() => {
           <NScrollbar class="table-scroll">
             <div class="header-table">
               <div class="table-row header">
-                <div class="table-cell">Key</div>
-                <div class="table-cell">Value</div>
+                <div class="table-cell key">Key</div>
+                <div class="table-cell value">Value</div>
               </div>
               <div v-for="header in headerList" :key="header.key" class="table-row">
                 <div class="table-cell key">{{ header.key }}</div>
-                <div class="table-cell">{{ header.value }}</div>
+                <div class="table-cell value">{{ header.value }}</div>
               </div>
             </div>
           </NScrollbar>
@@ -232,12 +243,12 @@ const testResults = computed(() => {
           <NScrollbar class="table-scroll">
             <div v-if="cookieList.length" class="header-table">
               <div class="table-row header">
-                <div class="table-cell">Name</div>
-                <div class="table-cell">Value</div>
+                <div class="table-cell key">Name</div>
+                <div class="table-cell value">Value</div>
               </div>
               <div v-for="cookie in cookieList" :key="cookie.name" class="table-row">
                 <div class="table-cell key">{{ cookie.name }}</div>
-                <div class="table-cell">{{ cookie.value }}</div>
+                <div class="table-cell value">{{ cookie.value }}</div>
               </div>
             </div>
             <NEmpty v-else description="无 Cookies" style="padding: 40px" />
@@ -398,6 +409,19 @@ const testResults = computed(() => {
   flex-direction: column;
 }
 
+.body-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--n-color-modal);
+  border-radius: 4px;
+  border: 1px solid var(--n-border-color);
+  z-index: 10;
+}
+
 .editor-wrapper {
   flex: 1;
   min-height: 0;
@@ -424,7 +448,7 @@ const testResults = computed(() => {
 
 .table-scroll {
   height: 100%;
-  padding: 8px 12px;
+  padding: 6px 8px;
 }
 
 .header-table {
@@ -440,8 +464,8 @@ const testResults = computed(() => {
 
 .table-row.header {
   background: var(--n-color-modal);
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: 600;
+  font-size: 11px;
   color: var(--n-text-color-2);
   position: sticky;
   top: 0;
@@ -454,17 +478,23 @@ const testResults = computed(() => {
 
 .table-cell {
   flex: 1;
-  padding: 12px 14px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   word-break: break-all;
 }
 
 .table-cell.key {
   font-weight: 600;
   color: var(--n-text-color);
-  max-width: 200px;
+  max-width: 240px;
   flex: none;
-  width: 200px;
+  width: 240px;
+  padding-right: 16px;
+}
+
+.table-cell.value {
+  flex: 1;
+  padding-left: 16px;
 }
 
 /* 响应式设计 */
@@ -487,12 +517,22 @@ const testResults = computed(() => {
   }
 
   .table-scroll {
-    padding: 6px 10px;
+    padding: 4px 6px;
   }
 
   .table-cell {
-    padding: 6px 8px;
-    font-size: 12px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .table-cell.key {
+    max-width: 200px;
+    width: 200px;
+    padding-right: 12px;
+  }
+
+  .table-cell.value {
+    padding-left: 12px;
   }
 
   .response-content :deep(.n-tabs-tab) {

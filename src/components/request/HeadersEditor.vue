@@ -150,8 +150,20 @@ const dropdownOptions = commonHeaders.map((h) => ({ label: h.label, key: h.key +
   overflow: auto;
 }
 
+.headers-editor :deep(.n-data-table-td) {
+  padding: 4px 8px;
+}
+
+.headers-editor :deep(.n-data-table-th) {
+  padding: 6px 8px;
+}
+
+.headers-editor :deep(.n-input) {
+  --n-height: 28px;
+}
+
 .editor-toolbar {
-  padding: 8px 0;
+  padding: 6px 0;
   display: flex;
   gap: 16px;
   align-items: center;

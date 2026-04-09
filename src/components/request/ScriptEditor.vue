@@ -75,7 +75,7 @@ function insertSnippet(code: string) {
     </div>
     <div class="editor-wrapper">
       <MonacoEditor
-        v-if="MonacoEditor.value"
+        v-if="MonacoEditor"
         v-model="scriptContent"
         language="javascript"
         height="300px"

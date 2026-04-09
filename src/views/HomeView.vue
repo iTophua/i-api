@@ -597,6 +597,13 @@ useShortcuts([
 .panels-container :deep(.n-split-pane-wrapper) {
   height: 100%;
   overflow: hidden;
+  min-height: 0;
+}
+
+.panels-container :deep(.n-split-pane) {
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .panels-container :deep(.n-split__left),

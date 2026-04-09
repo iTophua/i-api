@@ -294,7 +294,7 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
       <div v-else-if="bodyMode === 'raw'" class="content-section">
         <div class="editor-wrapper">
           <MonacoEditor
-            v-if="MonacoEditor.value"
+            v-if="MonacoEditor"
             v-model="rawContent"
             :language="editorLanguage"
             height="100%"
@@ -386,6 +386,10 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
 
 .raw-type-selector {
   opacity: 0.8;
+}
+
+.raw-type-selector :deep(.n-radio-button) {
+  padding: 0 8px;
 }
 
 .body-content {

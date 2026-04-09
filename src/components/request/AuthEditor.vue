@@ -169,33 +169,37 @@ watch(() => props.requestId, async (newId) => {
 <template>
   <div class="auth-editor">
     <div class="auth-type-selector">
-      <NSelect :value="authType" :options="authOptions" @update:value="authType = $event" />
+      <NSelect
+        :value="authType"
+        :options="authOptions"
+        size="small"
+        @update:value="authType = $event"
+      />
     </div>
 
     <div v-if="authType !== 'none'" class="secure-storage-hint">
-      <NSpace align="center">
-        <NIcon :component="LockClosedOutline" size="16" />
-        <span class="hint-text">敏感信息将使用系统密钥库安全存储</span>
-      </NSpace>
+      <NIcon :component="LockClosedOutline" size="14" />
+      <span class="hint-text">敏感信息将使用系统密钥库安全存储</span>
     </div>
 
     <div class="auth-config">
       <template v-if="authType === 'basic'">
         <NInputGroup>
-          <NInputGroupLabel>用户名</NInputGroupLabel>
-          <NInput v-model:value="basicUsername" placeholder="用户名" />
+          <NInputGroupLabel size="small">用户名</NInputGroupLabel>
+          <NInput v-model:value="basicUsername" placeholder="用户名" size="small" />
         </NInputGroup>
-        <NInputGroup style="margin-top: 8px">
-          <NInputGroupLabel>密码</NInputGroupLabel>
+        <NInputGroup class="input-group-gap">
+          <NInputGroupLabel size="small">密码</NInputGroupLabel>
           <NInput
             :value="displayBasicPassword"
             :type="showBasicPassword ? 'text' : 'password'"
             placeholder="密码"
+            size="small"
             @update:value="basicPassword = $event"
           >
             <template #suffix>
-              <NButton text size="small" @click="showBasicPassword = !showBasicPassword">
-                <NIcon :component="showBasicPassword ? EyeOffOutline : EyeOutline" />
+              <NButton text size="tiny" @click="showBasicPassword = !showBasicPassword">
+                <NIcon :component="showBasicPassword ? EyeOffOutline : EyeOutline" size="14" />
               </NButton>
             </template>
           </NInput>
@@ -204,16 +208,17 @@ watch(() => props.requestId, async (newId) => {
 
       <template v-else-if="authType === 'bearer'">
         <NInputGroup>
-          <NInputGroupLabel>Token</NInputGroupLabel>
+          <NInputGroupLabel size="small">Token</NInputGroupLabel>
           <NInput
             :value="displayBearerToken"
             :type="showBearerToken ? 'text' : 'password'"
             placeholder="Bearer Token"
+            size="small"
             @update:value="bearerToken = $event"
           >
             <template #suffix>
-              <NButton text size="small" @click="showBearerToken = !showBearerToken">
-                <NIcon :component="showBearerToken ? EyeOffOutline : EyeOutline" />
+              <NButton text size="tiny" @click="showBearerToken = !showBearerToken">
+                <NIcon :component="showBearerToken ? EyeOffOutline : EyeOutline" size="14" />
               </NButton>
             </template>
           </NInput>
@@ -221,40 +226,42 @@ watch(() => props.requestId, async (newId) => {
       </template>
 
       <template v-else-if="authType === 'apikey'">
-        <NInputGroup style="margin-bottom: 8px">
-          <NInputGroupLabel>Key</NInputGroupLabel>
-          <NInput v-model:value="apiKeyKey" placeholder="API Key 参数名" />
+        <NInputGroup class="input-group-gap-sm">
+          <NInputGroupLabel size="small">Key</NInputGroupLabel>
+          <NInput v-model:value="apiKeyKey" placeholder="API Key 参数名" size="small" />
         </NInputGroup>
-        <NInputGroup style="margin-bottom: 8px">
-          <NInputGroupLabel>Value</NInputGroupLabel>
+        <NInputGroup class="input-group-gap-sm">
+          <NInputGroupLabel size="small">Value</NInputGroupLabel>
           <NInput
             :value="displayApiKeyValue"
             :type="showApiKeyValue ? 'text' : 'password'"
             placeholder="API Key 值"
+            size="small"
             @update:value="apiKeyValue = $event"
           >
             <template #suffix>
-              <NButton text size="small" @click="showApiKeyValue = !showApiKeyValue">
-                <NIcon :component="showApiKeyValue ? EyeOffOutline : EyeOutline" />
+              <NButton text size="tiny" @click="showApiKeyValue = !showApiKeyValue">
+                <NIcon :component="showApiKeyValue ? EyeOffOutline : EyeOutline" size="14" />
               </NButton>
             </template>
           </NInput>
         </NInputGroup>
         <NInputGroup>
-          <NInputGroupLabel>添加到</NInputGroupLabel>
+          <NInputGroupLabel size="small">添加到</NInputGroupLabel>
           <NSelect
             :value="apiKeyAddTo"
             :options="[
               { label: 'Header', value: 'header' },
               { label: 'Query', value: 'query' },
             ]"
+            size="small"
             @update:value="(val: 'header' | 'query') => apiKeyAddTo = val"
           />
         </NInputGroup>
       </template>
 
       <template v-else>
-        <p style="color: var(--n-text-color-3)">该请求不需要认证</p>
+        <p class="no-auth-hint">该请求不需要认证</p>
       </template>
     </div>
   </div>
@@ -268,23 +275,40 @@ watch(() => props.requestId, async (newId) => {
 }
 
 .auth-type-selector {
-  margin-bottom: 16px;
-  max-width: 300px;
+  margin-bottom: 12px;
+  max-width: 200px;
 }
 
 .auth-config {
-  max-width: 500px;
+  max-width: 480px;
 }
 
 .secure-storage-hint {
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
   background-color: var(--n-color-hover);
   border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .hint-text {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--n-text-color-3);
+}
+
+.input-group-gap {
+  margin-top: 6px;
+}
+
+.input-group-gap-sm {
+  margin-bottom: 6px;
+}
+
+.no-auth-hint {
+  color: var(--n-text-color-3);
+  font-size: 12px;
+  margin: 0;
 }
 </style>

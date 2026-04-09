@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { invoke } from '@tauri-apps/api/core'
 import type { History } from '@/types'
 import { useSettingsStore } from './settings'
 import { safeParseDate } from '@/types'
@@ -82,14 +83,25 @@ export const useHistoryStore = defineStore('history', () => {
     }
   })
 
+  async function loadHistory(limit?: number) {
+    try {
+      const historyLimit = limit ?? settingsStore.settings?.historyLimit ?? 100
+      const result = await invoke<History[]>('get_recent_history', { limit: historyLimit })
+      histories.value = result
+    } catch (error) {
+      console.error('加载历史记录失败:', error)
+    }
+  }
+
   function addHistory(history: Omit<History, 'id' | 'createdAt'>) {
-    const maxHistory = settingsStore.settings?.historyLimit ?? 100
+    // 后端会自动保存历史记录，前端只需更新内存状态
     const newHistory: History = {
       ...history,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     }
     histories.value.unshift(newHistory)
+    const maxHistory = settingsStore.settings?.historyLimit ?? 100
     if (histories.value.length > maxHistory) {
       histories.value = histories.value.slice(0, maxHistory)
     }
@@ -163,6 +175,7 @@ export const useHistoryStore = defineStore('history', () => {
     filterMethod,
     filterStatus,
     dateRange,
+    loadHistory,
     addHistory,
     clearHistory,
     deleteHistory,

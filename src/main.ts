@@ -2,7 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import { createI18nInstance } from './locales'
-import { setI18nInstance } from './stores/settings'
+import { setI18nInstance, useSettingsStore } from './stores/settings'
+import { useHistoryStore } from './stores/history'
 import App from './App.vue'
 import type { Locale } from './locales'
 import './styles/theme.css'
@@ -15,11 +16,19 @@ setI18nInstance(i18n)
 
 const app = createApp(App)
 
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(router)
 app.use(i18n)
 
-router.isReady().then(() => {
+// 应用启动时加载历史记录
+router.isReady().then(async () => {
+  const settingsStore = useSettingsStore()
+  await settingsStore.loadSettings()
+
+  const historyStore = useHistoryStore()
+  await historyStore.loadHistory()
+
   router.replace('/splash')
 })
 

@@ -84,25 +84,25 @@ const sizeFormatted = computed(() => {
 
 <style scoped>
 .response-stats {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 8px 12px;
   border-bottom: 1px solid var(--n-border-color);
   background: var(--n-color-modal);
 }
 
 .stats-row {
   flex-wrap: wrap;
-  gap: var(--spacing-md);
+  gap: 12px;
 }
 
 .stat-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 100px;
+  gap: 2px;
+  min-width: 80px;
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--n-text-color-3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -110,7 +110,7 @@ const sizeFormatted = computed(() => {
 }
 
 .stat-value {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--n-text-color-1);
 }
@@ -118,12 +118,12 @@ const sizeFormatted = computed(() => {
 .performance-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .performance-level {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  min-width: 40px;
+  min-width: 36px;
 }
 </style>

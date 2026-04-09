@@ -120,8 +120,20 @@ const columns: DataTableColumns<KeyValuePair> = [
   overflow: auto;
 }
 
+.params-editor :deep(.n-data-table-td) {
+  padding: 4px 8px;
+}
+
+.params-editor :deep(.n-data-table-th) {
+  padding: 6px 8px;
+}
+
+.params-editor :deep(.n-input) {
+  --n-height: 28px;
+}
+
 .add-row {
-  padding: 8px 0;
+  padding: 6px 0;
   cursor: pointer;
   flex-shrink: 0;
 }

@@ -15,83 +15,43 @@ const successRate = computed(() => {
 
 <template>
   <div class="history-statistics">
-    <NFlex justify="space-between" align="center" class="stats-header">
-      <span class="stats-title">历史记录统计</span>
-      <NTag type="info" size="small">成功率 {{ successRate }}%</NTag>
-    </NFlex>
-
-    <NFlex class="stats-content">
+    <NFlex justify="space-between" align="center">
       <div class="stat-item">
-        <div class="stat-value">{{ stats.total }}</div>
-        <div class="stat-label">总请求数</div>
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">总请求</span>
       </div>
 
       <div class="stat-item success">
-        <div class="stat-value">{{ stats.successCount }}</div>
-        <div class="stat-label">成功</div>
+        <span class="stat-value">{{ stats.successCount }}</span>
+        <span class="stat-label">成功</span>
       </div>
 
       <div class="stat-item error">
-        <div class="stat-value">{{ stats.errorCount }}</div>
-        <div class="stat-label">失败</div>
+        <span class="stat-value">{{ stats.errorCount }}</span>
+        <span class="stat-label">失败</span>
       </div>
 
       <div class="stat-item">
-        <div class="stat-value">{{ stats.avgResponseTime }}ms</div>
-        <div class="stat-label">平均响应时间</div>
+        <span class="stat-value">{{ stats.avgResponseTime }}<small>ms</small></span>
+        <span class="stat-label">平均耗时</span>
       </div>
+
+      <NTag type="info" size="small" class="success-rate">{{ successRate }}%</NTag>
     </NFlex>
   </div>
 </template>
 
 <style scoped>
 .history-statistics {
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--n-border-color);
-  background: linear-gradient(135deg, var(--color-brand-light) 0%, var(--n-color) 100%);
-}
-
-.stats-header {
-  margin-bottom: var(--spacing-sm);
-}
-
-.stats-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--n-text-color-1);
-}
-
-.stats-content {
-  flex-wrap: wrap;
+  background: var(--n-color);
 }
 
 .stat-item {
-  text-align: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  background: var(--n-color);
-  min-width: 100px;
-  transition: all 0.2s ease;
-}
-
-.stat-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-
-.stat-item.success {
-  background: rgba(24, 160, 88, 0.1);
-}
-
-.stat-item.error {
-  background: rgba(214, 48, 49, 0.1);
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--n-text-color-1);
-  line-height: 1.2;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
 }
 
 .stat-item.success .stat-value {
@@ -102,10 +62,24 @@ const successRate = computed(() => {
   color: var(--color-error);
 }
 
+.stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--n-text-color-1);
+}
+
+.stat-value small {
+  font-size: 10px;
+  font-weight: 400;
+  margin-left: 1px;
+}
+
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--n-text-color-3);
-  margin-top: 4px;
-  font-weight: 500;
+}
+
+.success-rate {
+  margin-left: auto;
 }
 </style>

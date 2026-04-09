@@ -45,57 +45,6 @@ let resizeObserver: ResizeObserver | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 let pendingLayout = false
 
-function forceOverflowHidden() {
-  if (!containerRef.value) return
-  const dom = containerRef.value
-  const editorEl = dom.querySelector('.monaco-editor')
-  const overflowGuard = dom.querySelector('.overflow-guard')
-  const scrollable = dom.querySelector('.monaco-scrollable-element')
-  const linesContent = dom.querySelector('.lines-content')
-  const viewLines = dom.querySelector('.view-lines')
-
-  if (editorEl) {
-    ;(editorEl as HTMLElement).style.position = 'absolute'
-    ;(editorEl as HTMLElement).style.top = '0'
-    ;(editorEl as HTMLElement).style.left = '0'
-    ;(editorEl as HTMLElement).style.right = '0'
-    ;(editorEl as HTMLElement).style.bottom = '0'
-    ;(editorEl as HTMLElement).style.overflow = 'hidden'
-    ;(editorEl as HTMLElement).style.width = '100%'
-    ;(editorEl as HTMLElement).style.height = '100%'
-  }
-  if (overflowGuard) {
-    ;(overflowGuard as HTMLElement).style.position = 'absolute'
-    ;(overflowGuard as HTMLElement).style.top = '0'
-    ;(overflowGuard as HTMLElement).style.left = '0'
-    ;(overflowGuard as HTMLElement).style.right = '0'
-    ;(overflowGuard as HTMLElement).style.bottom = '0'
-    ;(overflowGuard as HTMLElement).style.overflow = 'hidden'
-    ;(overflowGuard as HTMLElement).style.width = '100%'
-    ;(overflowGuard as HTMLElement).style.height = '100%'
-  }
-  if (scrollable) {
-    ;(scrollable as HTMLElement).style.position = 'absolute'
-    ;(scrollable as HTMLElement).style.top = '0'
-    ;(scrollable as HTMLElement).style.left = '0'
-    ;(scrollable as HTMLElement).style.right = '0'
-    ;(scrollable as HTMLElement).style.bottom = '0'
-    ;(scrollable as HTMLElement).style.overflow = 'hidden'
-    ;(scrollable as HTMLElement).style.width = '100%'
-    ;(scrollable as HTMLElement).style.height = '100%'
-  }
-  if (linesContent) {
-    ;(linesContent as HTMLElement).style.position = 'absolute'
-    ;(linesContent as HTMLElement).style.left = '0'
-    ;(linesContent as HTMLElement).style.overflow = 'hidden'
-  }
-  if (viewLines) {
-    ;(viewLines as HTMLElement).style.position = 'absolute'
-    ;(viewLines as HTMLElement).style.left = '0'
-    ;(viewLines as HTMLElement).style.overflow = 'hidden'
-  }
-}
-
 function initEditor() {
   if (!containerRef.value || editor) return
 
@@ -105,13 +54,18 @@ function initEditor() {
     readOnly: props.readOnly,
     minimap: { enabled: props.minimap },
     lineNumbers: props.lineNumbers ? 'on' : 'off',
+    lineNumbersMinChars: 3,
+    lineDecorationsWidth: 20,
     wordWrap: props.wordWrap,
     fontSize: 13,
     tabSize: 2,
     automaticLayout: false,
     scrollBeyondLastLine: false,
     folding: true,
-    foldingStrategy: 'indentation',
+    foldingStrategy: 'auto',
+    showFoldingControls: 'always',
+    unfoldOnClickAfterEndOfLine: false,
+    stickyScroll: { enabled: false },
     renderWhitespace: 'selection',
     formatOnPaste: true,
     formatOnType: true,
@@ -121,9 +75,8 @@ function initEditor() {
       verticalScrollbarSize: 8,
       horizontalScrollbarSize: 8,
     },
+    contextmenu: false,
   })
-
-  forceOverflowHidden()
 
   editor.onDidChangeModelContent(() => {
     const value = editor?.getValue() || ''
@@ -146,7 +99,6 @@ function initEditor() {
                 nextTick(() => {
                   try {
                     editor?.layout()
-                    forceOverflowHidden()
                   } catch (e) {
                     console.warn('Monaco delayed layout error:', e)
                   }
@@ -165,7 +117,6 @@ function initEditor() {
           nextTick(() => {
             try {
               editor?.layout()
-              forceOverflowHidden()
             } catch (e) {
               console.warn('Monaco layout error:', e)
             }
@@ -253,14 +204,12 @@ defineExpose({
       const rect = containerRef.value.getBoundingClientRect()
       if (rect.width > 0 && rect.height > 0) {
         editor.layout()
-        forceOverflowHidden()
       }
     }
   },
   forceLayout: () => {
     if (editor) {
       editor.layout()
-      forceOverflowHidden()
     }
   },
 })
@@ -286,43 +235,17 @@ defineExpose({
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  overflow: hidden !important;
-  width: 100% !important;
-  height: 100% !important;
 }
 
 .monaco-editor-container .overflow-guard {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   overflow: hidden !important;
-  width: 100% !important;
-  height: 100% !important;
 }
 
 .monaco-editor-container .monaco-scrollable-element {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   overflow: hidden !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.monaco-editor-container .lines-content,
-.monaco-editor-container .view-lines {
-  position: absolute !important;
-  left: 0 !important;
-  overflow: hidden !important;
-  width: 100% !important;
 }
 
 .monaco-editor-container .monaco-editor .editor-scrollable {
-  position: absolute !important;
   overflow: hidden !important;
 }
 </style>

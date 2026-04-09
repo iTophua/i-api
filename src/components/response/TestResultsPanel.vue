@@ -178,39 +178,39 @@ const statusIcon = (status: string) => {
 
 <style scoped>
 .test-results-panel {
-  padding: var(--spacing-md);
+  padding: 8px 12px;
   background: var(--n-color);
   height: 100%;
   overflow-y: auto;
 }
 
 .test-overview {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 12px;
 }
 
 .overview-header {
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 8px;
 }
 
 .overview-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--n-text-color-1);
 }
 
 .overview-stats {
   display: flex;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
+  gap: 8px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 
 .stat-item {
   text-align: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  border-radius: 4px;
   background: var(--n-color-hover);
-  min-width: 60px;
+  min-width: 50px;
 }
 
 .stat-item.success {
@@ -226,7 +226,7 @@ const statusIcon = (status: string) => {
 }
 
 .stat-value {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--n-text-color-1);
   line-height: 1.2;
@@ -245,7 +245,7 @@ const statusIcon = (status: string) => {
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--n-text-color-3);
   margin-top: 2px;
   font-weight: 500;
@@ -253,21 +253,21 @@ const statusIcon = (status: string) => {
 }
 
 .test-details {
-  margin-top: var(--spacing-md);
+  margin-top: 12px;
 }
 
 .test-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 4px;
 }
 
 .test-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
   border-left: 3px solid transparent;
   transition: all 0.2s ease;
 }
@@ -297,10 +297,10 @@ const statusIcon = (status: string) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -325,10 +325,10 @@ const statusIcon = (status: string) => {
 }
 
 .test-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--n-text-color-1);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -338,8 +338,8 @@ const statusIcon = (status: string) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   font-size: 10px;
   font-weight: 600;
@@ -349,7 +349,7 @@ const statusIcon = (status: string) => {
 }
 
 .test-message {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--n-text-color-3);
   line-height: 1.4;
   word-break: break-word;
@@ -360,11 +360,11 @@ const statusIcon = (status: string) => {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 2px;
 }
 
 .test-duration {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--n-text-color-3);
   font-weight: 500;
 }
@@ -375,14 +375,14 @@ const statusIcon = (status: string) => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: var(--spacing-xl);
+  padding: 40px;
   text-align: center;
 }
 
 .no-tests-icon {
-  width: 80px;
-  height: 80px;
-  margin-bottom: var(--spacing-md);
+  width: 64px;
+  height: 64px;
+  margin-bottom: 12px;
   opacity: 0.4;
   color: var(--n-text-color-3);
 }
@@ -393,14 +393,14 @@ const statusIcon = (status: string) => {
 }
 
 .no-tests-text {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--n-text-color-2);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .no-tests-hint {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--n-text-color-3);
   line-height: 1.5;
 }

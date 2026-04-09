@@ -2,9 +2,20 @@
 import { NList, NListItem, NButton, NTag, NFlex, NEmpty, NTooltip } from 'naive-ui'
 import { computed } from 'vue'
 import { useHistoryStore } from '@/stores'
-import { HttpMethodIcon } from '@/components/icons'
+import { AppIcon } from '@/components/icons'
 import type { History } from '@/types'
-import { safeParseDate } from '@/types'
+import { safeParseDate, HTTP_METHOD_COLORS } from '@/types'
+
+// 使用统一的方法颜色定义（适配 HistoryList 的 bg 字段）
+const methodColors: Record<string, { color: string; bg: string }> = {
+  GET: { color: HTTP_METHOD_COLORS.GET.color, bg: HTTP_METHOD_COLORS.GET.background },
+  POST: { color: HTTP_METHOD_COLORS.POST.color, bg: HTTP_METHOD_COLORS.POST.background },
+  PUT: { color: HTTP_METHOD_COLORS.PUT.color, bg: HTTP_METHOD_COLORS.PUT.background },
+  DELETE: { color: HTTP_METHOD_COLORS.DELETE.color, bg: HTTP_METHOD_COLORS.DELETE.background },
+  PATCH: { color: HTTP_METHOD_COLORS.PATCH.color, bg: HTTP_METHOD_COLORS.PATCH.background },
+  OPTIONS: { color: HTTP_METHOD_COLORS.OPTIONS.color, bg: HTTP_METHOD_COLORS.OPTIONS.background },
+  HEAD: { color: HTTP_METHOD_COLORS.HEAD.color, bg: HTTP_METHOD_COLORS.HEAD.background },
+}
 
 interface Props {
   histories?: History[]
@@ -84,10 +95,18 @@ function handleDelete(id: string, event: Event) {
       >
         <div class="item-content">
           <div class="item-left">
-            <HttpMethodIcon :method="history.method" :size="14" filled />
             <div class="item-main">
               <div class="item-url">{{ history.url }}</div>
               <div class="item-meta">
+                <span
+                  class="method-tag"
+                  :style="{
+                    color: methodColors[history.method]?.color || methodColors.GET.color,
+                    background: methodColors[history.method]?.bg || methodColors.GET.bg,
+                  }"
+                >
+                  {{ history.method }}
+                </span>
                 <NTag :type="getStatusType(history.status)" size="small" bordered>
                   {{ history.status }}
                 </NTag>
@@ -142,6 +161,7 @@ function handleDelete(id: string, event: Event) {
   border-bottom: 1px solid var(--n-border-color);
 }
 
+
 .history-item:hover {
   background: var(--n-color-hover);
   transform: translateX(2px);
@@ -151,13 +171,11 @@ function handleDelete(id: string, event: Event) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-xs) 0;
 }
 
 .item-left {
   display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
+  align-items: center;
   flex: 1;
   min-width: 0;
 }
@@ -168,20 +186,29 @@ function handleDelete(id: string, event: Event) {
 }
 
 .item-url {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--n-text-color-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   font-weight: 500;
 }
 
 .item-meta {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  font-size: 11px;
+  gap: 6px;
+  font-size: 9px;
+  margin-top: 1px;
+}
+
+.method-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
 }
 
 .item-time,

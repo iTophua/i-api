@@ -27,6 +27,7 @@ import AuthEditor from './AuthEditor.vue'
 import ScriptEditor from './ScriptEditor.vue'
 import SaveRequestModal from '@/components/common/SaveRequestModal.vue'
 import type { Response } from '@/types'
+import { HTTP_METHOD_COLORS } from '@/types'
 
 const message = useMessage()
 const settingsStore = useSettingsStore()
@@ -59,16 +60,44 @@ const methodOptions = [
   { label: 'HEAD', value: 'HEAD' },
 ]
 
+// 使用统一的方法颜色定义
+const methodColors = HTTP_METHOD_COLORS
+
 function renderMethodLabel(option: { label: string; value: string }) {
-  const tagType = methodTypes[option.value] || 'info'
+  const colors = methodColors[option.value] || methodColors.GET
   return h(
-    NTag,
+    'span',
     {
-      type: tagType,
-      size: 'medium',
-      bordered: true,
+      style: {
+        color: colors.color,
+        background: colors.background,
+        fontSize: '12px',
+        fontWeight: 700,
+        padding: '2px 6px',
+        borderRadius: '3px',
+        letterSpacing: '0.5px',
+      }
     },
-    { default: () => option.label }
+    option.label
+  )
+}
+
+function renderMethodTag(props: { option: { label: string; value: string }; handleClose: () => void }) {
+  const colors = methodColors[props.option.value] || methodColors.GET
+  return h(
+    'span',
+    {
+      style: {
+        color: colors.color,
+        background: colors.background,
+        fontSize: '12px',
+        fontWeight: 700,
+        padding: '2px 6px',
+        borderRadius: '3px',
+        letterSpacing: '0.5px',
+      }
+    },
+    props.option.label
   )
 }
 
@@ -358,8 +387,8 @@ onUnmounted(() => {
         :options="methodOptions"
         :consistent-menu-width="false"
         :render-label="renderMethodLabel"
-        :render-tag="renderMethodLabel"
-        style="width: 100px"
+        :render-tag="renderMethodTag"
+        style="width: 110px"
         aria-label="HTTP 方法选择"
         @update:value="requestStore.updateMethod"
       />
@@ -443,7 +472,7 @@ onUnmounted(() => {
 
     <div class="request-tabs-container">
       <NTabs v-model:value="currentTab" type="line" role="tablist" aria-label="请求选项卡">
-        <NTabPane name="params">
+        <NTabPane name="params" display-directive="show">
           <template #tab>
             <span class="tab-with-badge">
               {{ t('request.params') }}
@@ -458,7 +487,7 @@ onUnmounted(() => {
           </div>
         </NTabPane>
 
-        <NTabPane name="authorization">
+        <NTabPane name="authorization" display-directive="show">
           <template #tab>{{ t('request.authorization') }}</template>
           <div class="tab-scroll-content">
             <AuthEditor
@@ -469,7 +498,7 @@ onUnmounted(() => {
           </div>
         </NTabPane>
 
-        <NTabPane name="headers">
+        <NTabPane name="headers" display-directive="show">
           <template #tab>
             <span class="tab-with-badge">
               {{ t('request.headers') }}
@@ -489,7 +518,7 @@ onUnmounted(() => {
           </div>
         </NTabPane>
 
-        <NTabPane name="body">
+        <NTabPane name="body" display-directive="show">
           <template #tab>{{ t('request.body') }}</template>
           <div class="tab-scroll-content">
             <BodyEditor
@@ -499,7 +528,7 @@ onUnmounted(() => {
           </div>
         </NTabPane>
 
-        <NTabPane name="preScript">
+        <NTabPane name="preScript" display-directive="show">
           <template #tab>{{ t('request.preRequestScript') }}</template>
           <div class="tab-scroll-content">
             <ScriptEditor
@@ -509,7 +538,7 @@ onUnmounted(() => {
           </div>
         </NTabPane>
 
-        <NTabPane name="tests">
+        <NTabPane name="tests" display-directive="show">
           <template #tab>{{ t('request.testScript') }}</template>
           <div class="tab-scroll-content">
             <ScriptEditor
@@ -519,7 +548,7 @@ onUnmounted(() => {
           </div>
         </NTabPane>
 
-        <NTabPane name="settings">
+        <NTabPane name="settings" display-directive="show">
           <template #tab>
             <NIcon :component="SettingsOutline" />
           </template>
@@ -710,6 +739,8 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .request-tabs-container :deep(.n-tabs) {
