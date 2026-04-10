@@ -103,6 +103,7 @@ export default {
     newEnvironment: 'New Environment',
     renameEnvironment: 'Rename Environment',
     deleteEnvironment: 'Delete Environment',
+    manageEnvironments: 'Manage Environments',
     variables: 'Variables',
     addVariable: 'Add Variable',
     variableName: 'Variable Name',

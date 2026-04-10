@@ -105,6 +105,7 @@ export default {
     newEnvironment: '新建环境',
     renameEnvironment: '重命名环境',
     deleteEnvironment: '删除环境',
+    manageEnvironments: '管理环境',
     variables: '变量',
     addVariable: '添加变量',
     variableName: '变量名',

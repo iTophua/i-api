@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { NInput, NSelect, NButton } from 'naive-ui'
-import { ref, watch, computed } from 'vue'
+import { NInput, NSelect, NButton, NPopconfirm, NTooltip } from 'naive-ui'
+import { ref, watch } from 'vue'
 import { useHistoryStore } from '@/stores'
 import HistoryStatistics from './HistoryStatistics.vue'
 import HistoryList from './HistoryList.vue'
@@ -38,14 +38,6 @@ const statusOptions = [
   { label: '5xx', value: '5xx' },
 ]
 
-const hasActiveFilters = computed(() => {
-  return (
-    historyStore.searchQuery !== '' ||
-    historyStore.filterMethod !== 'all' ||
-    historyStore.filterStatus !== 'all'
-  )
-})
-
 const emit = defineEmits<{
   select: [history: History]
 }>()
@@ -58,11 +50,6 @@ function handleDeleteHistory(id: string) {
   historyStore.deleteHistory(id)
 }
 
-function handleClearFilters() {
-  historyStore.clearFiltered()
-  searchInput.value = ''
-}
-
 function handleClearAll() {
   historyStore.clearHistory()
   searchInput.value = ''
@@ -71,29 +58,6 @@ function handleClearAll() {
 
 <template>
   <div class="history-panel">
-    <HistoryStatistics />
-
-    <!-- 第一行：两个下拉框 -->
-    <div class="filters-row">
-      <div class="filter-item method-filter">
-        <NSelect
-          v-model:value="historyStore.filterMethod"
-          :options="methodOptions"
-          size="small"
-          class="filter-select"
-        />
-      </div>
-      <div class="filter-item status-filter">
-        <NSelect
-          v-model:value="historyStore.filterStatus"
-          :options="statusOptions"
-          size="small"
-          class="filter-select"
-        />
-      </div>
-    </div>
-
-    <!-- 第二行：搜索框 + 清空按钮 -->
     <div class="search-row">
       <NInput
         v-model:value="searchInput"
@@ -107,17 +71,43 @@ function handleClearAll() {
         </template>
       </NInput>
 
-      <NButton size="small" type="error" secondary @click="handleClearAll">
-        <AppIcon type="trash" :size="14" />
-      </NButton>
+      <NTooltip placement="top">
+        <template #trigger>
+          <NPopconfirm positive-text="确定" negative-text="取消" @positive-click="handleClearAll">
+            <template #trigger>
+              <NButton size="small" type="error" secondary class="add-btn">
+                <AppIcon type="trash" :size="14" />
+              </NButton>
+            </template>
+            确定要清空所有历史记录吗？此操作不可恢复。
+          </NPopconfirm>
+        </template>
+        清空历史记录
+      </NTooltip>
     </div>
 
-    <div class="history-count-bar">
-      <span class="history-count">
-        共 {{ historyStore.filteredHistories.length }} / {{ historyStore.histories.length }} 条记录
-      </span>
+    <div class="filters-row">
+      <div class="filter-item method-filter">
+        <span class="filter-label">方法</span>
+        <NSelect
+          v-model:value="historyStore.filterMethod"
+          :options="methodOptions"
+          size="small"
+          class="filter-select"
+        />
+      </div>
+      <div class="filter-item status-filter">
+        <span class="filter-label">状态</span>
+        <NSelect
+          v-model:value="historyStore.filterStatus"
+          :options="statusOptions"
+          size="small"
+          class="filter-select"
+        />
+      </div>
     </div>
 
+    <HistoryStatistics />
     <HistoryList
       @select="handleSelectHistory"
       @delete="handleDeleteHistory"
@@ -134,15 +124,34 @@ function handleClearAll() {
   overflow: hidden;
 }
 
-/* 第一行：两个下拉框 */
+.search-row {
+  flex-shrink: 0;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
 .filters-row {
   flex-shrink: 0;
-  padding: var(--spacing-xs) var(--spacing-md);
+  padding: 4px;
   border-bottom: 1px solid var(--n-border-color);
   background: var(--n-color);
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 4px;
 }
 
 .filter-item {
@@ -152,17 +161,18 @@ function handleClearAll() {
 }
 
 .filter-item.method-filter {
-  flex: 1.2;
+  flex: 1.1;
+  margin-right: 6px;
 }
 
 .filter-item.status-filter {
-  flex: 0.7;
+  flex: 1;
 }
 
 .filter-label {
-  font-size: 12px;
+  font-size: var(--font-size-compact-xs);
   color: var(--n-text-color-3);
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .filter-select {
@@ -170,33 +180,15 @@ function handleClearAll() {
   min-width: 0;
 }
 
-
-
-/* 第二行：搜索 + 按钮 */
-.search-row {
-  flex-shrink: 0;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-bottom: 1px solid var(--n-border-color);
-  background: var(--n-color);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.search-input {
-  flex: 1;
-  min-width: 0;
-}
-
 .history-count-bar {
   flex-shrink: 0;
-  padding: var(--spacing-xs) var(--spacing-md);
+  padding: 4px;
   border-bottom: 1px solid var(--n-border-color);
   background: var(--n-color);
 }
 
 .history-count {
-  font-size: 11px;
+  font-size: var(--font-size-compact-sm);
   color: var(--n-text-color-3);
   font-weight: 500;
 }

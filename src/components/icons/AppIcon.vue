@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-  type?: 'request' | 'collection' | 'folder' | 'environment' | 'history' | 'settings'
+  type?: 'request' | 'collection' | 'folder' | 'environment' | 'history' | 'settings' | 'send' | 'save' | 'close' | 'check' | 'plus' | 'minus' | 'chevronLeft' | 'chevronRight' | 'chevronDown' | 'search' | 'trash' | 'edit' | 'copy' | 'download' | 'upload' | 'refresh' | 'play' | 'stop' | 'menu' | 'moreVertical'
   size?: number
 }
 

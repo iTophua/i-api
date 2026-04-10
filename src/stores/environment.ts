@@ -6,12 +6,26 @@ import { safeParseDate } from '@/types'
 
 export const useEnvironmentStore = defineStore('environment', () => {
   const environments = ref<Environment[]>([])
-  const currentEnvironmentId = ref<string>('default')
+  const savedEnvId = (() => {
+    try {
+      return localStorage.getItem('iapi-current-environment') || 'default'
+    } catch {
+      return 'default'
+    }
+  })()
+  const currentEnvironmentId = ref<string>(savedEnvId)
+  const managerEnvironmentId = ref<string>('default')
   const isLoaded = ref(false)
 
   const currentEnvironment = computed(
     () =>
       environments.value.find((e: Environment) => e.id === currentEnvironmentId.value) ||
+      environments.value[0]
+  )
+
+  const managerEnvironment = computed(
+    () =>
+      environments.value.find((e: Environment) => e.id === managerEnvironmentId.value) ||
       environments.value[0]
   )
 
@@ -27,6 +41,11 @@ export const useEnvironmentStore = defineStore('environment', () => {
 
   function setCurrentEnvironment(id: string) {
     currentEnvironmentId.value = id
+    localStorage.setItem('iapi-current-environment', id)
+  }
+
+  function setManagerEnvironment(id: string) {
+    managerEnvironmentId.value = id
   }
 
   async function createEnvironment(name: string): Promise<Environment> {
@@ -40,7 +59,7 @@ export const useEnvironmentStore = defineStore('environment', () => {
 
     try {
       await invoke('save_environment', { environment: env })
-      environments.value.push(env)
+      environments.value = [...environments.value, env]
       return env
     } catch (e) {
       console.error('创建环境失败:', e)
@@ -82,6 +101,12 @@ export const useEnvironmentStore = defineStore('environment', () => {
   }
 
   async function deleteEnvironment(id: string) {
+    // 禁止删除默认环境
+    if (id === 'default') {
+      console.warn('不能删除默认环境')
+      return
+    }
+
     if (environments.value.length <= 1) return
 
     try {
@@ -89,6 +114,9 @@ export const useEnvironmentStore = defineStore('environment', () => {
       environments.value = environments.value.filter((e: Environment) => e.id !== id)
       if (currentEnvironmentId.value === id && environments.value.length > 0) {
         currentEnvironmentId.value = environments.value[0].id
+      }
+      if (managerEnvironmentId.value === id && environments.value.length > 0) {
+        managerEnvironmentId.value = environments.value[0].id
       }
     } catch (e) {
       console.error('删除环境失败:', e)
@@ -269,6 +297,24 @@ export const useEnvironmentStore = defineStore('environment', () => {
           createdAt: safeParseDate(env.createdAt),
           updatedAt: safeParseDate(env.updatedAt),
         }))
+        
+        // 检查是否存在默认环境，不存在则创建
+        const hasDefaultEnv = environments.value.some(e => e.id === 'default')
+        if (!hasDefaultEnv) {
+          const defaultEnv: Environment = {
+            id: 'default',
+            name: '默认环境',
+            variables: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+          await invoke('save_environment', { environment: defaultEnv })
+          environments.value.unshift(defaultEnv)
+        }
+
+        if (!environments.value.some(e => e.id === currentEnvironmentId.value)) {
+          currentEnvironmentId.value = 'default'
+        }
       } else {
         const defaultEnv: Environment = {
           id: 'default',
@@ -299,9 +345,12 @@ export const useEnvironmentStore = defineStore('environment', () => {
   return {
     environments,
     currentEnvironmentId,
+    managerEnvironmentId,
     currentEnvironment,
+    managerEnvironment,
     variables,
     setCurrentEnvironment,
+    setManagerEnvironment,
     createEnvironment,
     renameEnvironment,
     updateEnvironment,

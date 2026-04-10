@@ -7,6 +7,7 @@ import {
   DownloadOutline,
   CloudUploadOutline,
   CodeSlashOutline,
+  GlobeOutline,
 } from '@vicons/ionicons5'
 import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   'toggle-theme': []
   'select-environment': [id: string]
   'open-settings': []
+  'open-environment-manager': []
 }>()
 
 const importOptions = [
@@ -65,6 +67,8 @@ const environmentOptions = computed(() =>
   <div class="titlebar" data-tauri-drag-region>
     <div class="titlebar-traffic-light-spacer"></div>
 
+    <div class="titlebar-drag-area"></div>
+
     <div class="titlebar-logo">
       <Logo :size="24" :show-text="false" />
     </div>
@@ -103,6 +107,17 @@ const environmentOptions = computed(() =>
       />
       <NTooltip :show-arrow="false">
         <template #trigger>
+          <NButton quaternary circle size="small" @click="$emit('open-environment-manager')">
+            <template #icon>
+              <NIcon :component="GlobeOutline" />
+            </template>
+          </NButton>
+        </template>
+        {{ t('environment.manageEnvironments') }}
+      </NTooltip>
+      <div class="divider"></div>
+      <NTooltip :show-arrow="false">
+        <template #trigger>
           <NButton quaternary circle size="small" @click="$emit('toggle-theme')">
             <template #icon>
               <NIcon :component="isDark ? SunnyOutline : MoonOutline" />
@@ -111,11 +126,16 @@ const environmentOptions = computed(() =>
         </template>
         {{ isDark ? t('settings.light') : t('settings.dark') }}
       </NTooltip>
-      <NButton quaternary circle size="small" @click="$emit('open-settings')">
-        <template #icon>
-          <NIcon :component="SettingsSharp" />
+      <NTooltip :show-arrow="false">
+        <template #trigger>
+          <NButton quaternary circle size="small" @click="$emit('open-settings')">
+            <template #icon>
+              <NIcon :component="SettingsSharp" />
+            </template>
+          </NButton>
         </template>
-      </NButton>
+        {{ t('settings.settings') }}
+      </NTooltip>
     </div>
   </div>
 </template>
@@ -136,6 +156,10 @@ const environmentOptions = computed(() =>
   -webkit-app-region: no-drag;
 }
 
+.titlebar-drag-area {
+  flex: 1;
+}
+
 .titlebar-logo {
   position: absolute;
   left: 50%;
@@ -147,9 +171,9 @@ const environmentOptions = computed(() =>
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 1;
   justify-content: flex-end;
   padding-right: 12px;
+  -webkit-app-region: no-drag;
 }
 
 .divider {

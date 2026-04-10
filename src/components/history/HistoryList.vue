@@ -82,6 +82,12 @@ function handleDelete(id: string, event: Event) {
   event.stopPropagation()
   emit('delete', id)
 }
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 </script>
 
 <template>
@@ -111,7 +117,7 @@ function handleDelete(id: string, event: Event) {
                   {{ history.status }}
                 </NTag>
                 <span class="item-time">{{ formatTime(history.createdAt) }}</span>
-                <span class="item-size">{{ history.responseSize }} B</span>
+                <span class="item-size">{{ formatSize(history.responseSize) }}</span>
               </div>
             </div>
           </div>
@@ -156,11 +162,21 @@ function handleDelete(id: string, event: Event) {
   min-height: 0;
 }
 
+.history-list-component :deep(.n-list-item) {
+  padding-left: 6px;
+  padding-right: 6px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
 .history-item {
   transition: all 0.2s ease;
   border-bottom: 1px solid var(--n-border-color);
 }
 
+.history-item :deep(.n-tag) {
+  padding: 0 3px;
+}
 
 .history-item:hover {
   background: var(--n-color-hover);
@@ -186,7 +202,7 @@ function handleDelete(id: string, event: Event) {
 }
 
 .item-url {
-  font-size: 12px;
+  font-size: var(--font-size-compact-sm);
   color: var(--n-text-color-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -199,12 +215,12 @@ function handleDelete(id: string, event: Event) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--font-size-compact-xs);
   margin-top: 1px;
 }
 
 .method-tag {
-  font-size: 9px;
+  font-size: var(--font-size-compact-xs);
   font-weight: 700;
   padding: 0 3px;
   border-radius: 2px;

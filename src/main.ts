@@ -2,8 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import { createI18nInstance } from './locales'
-import { setI18nInstance, useSettingsStore } from './stores/settings'
-import { useHistoryStore } from './stores/history'
+import { setI18nInstance } from './stores/settings'
 import App from './App.vue'
 import type { Locale } from './locales'
 import './styles/theme.css'
@@ -21,15 +20,7 @@ app.use(pinia)
 app.use(router)
 app.use(i18n)
 
-// 应用启动时加载历史记录
-router.isReady().then(async () => {
-  const settingsStore = useSettingsStore()
-  await settingsStore.loadSettings()
-
-  const historyStore = useHistoryStore()
-  await historyStore.loadHistory()
-
-  router.replace('/splash')
-})
+// 直接设置初始路由为 splash
+router.replace('/splash')
 
 app.mount('#app')

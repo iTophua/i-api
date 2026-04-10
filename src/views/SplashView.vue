@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSettingsStore, useRequestStore, useEnvironmentStore } from '@/stores'
+import { useSettingsStore, useRequestStore, useEnvironmentStore, useHistoryStore } from '@/stores'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()
 const requestStore = useRequestStore()
 const environmentStore = useEnvironmentStore()
+const historyStore = useHistoryStore()
 
 const progress = ref(0)
 const status = ref('正在初始化...')
@@ -31,27 +32,32 @@ onMounted(async () => {
     progress.value = 24
     await environmentStore.loadEnvironments()
 
-    // 阶段3: 加载集合
+    // 阶段3: 加载历史记录
+    status.value = '加载历史记录...'
+    progress.value = 30
+    await historyStore.loadHistory()
+
+    // 阶段4: 加载集合
     status.value = '加载集合...'
     progress.value = 36
     await requestStore.loadCollections()
 
-    // 阶段4: 加载上次打开的 tabs
+    // 阶段5: 加载上次打开的 tabs
     status.value = '恢复上次会话...'
     progress.value = 48
     await requestStore.loadTabs()
 
-    // 阶段5: 加载临时请求
+    // 阶段6: 加载临时请求
     status.value = '加载临时请求...'
     progress.value = 60
     await requestStore.loadTemporaryRequest()
 
-    // 阶段6: 加载应用状态
+    // 阶段7: 加载应用状态
     status.value = '恢复应用状态...'
     progress.value = 80
     await settingsStore.loadAppState()
 
-    // 阶段7: 完成
+    // 阶段8: 完成
     status.value = '准备就绪'
     progress.value = 100
 

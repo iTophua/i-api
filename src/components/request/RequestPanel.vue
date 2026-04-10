@@ -2,19 +2,16 @@
 import {
   NSelect,
   NInput,
-  NInputNumber,
   NButton,
   NIcon,
   NDropdown,
   NBadge,
   NTabs,
   NTabPane,
-  NSwitch,
-  NTag,
   useMessage,
   NProgress,
 } from 'naive-ui'
-import { SettingsOutline, ChevronDownOutline, StopOutline } from '@vicons/ionicons5'
+import { ChevronDownOutline, StopOutline } from '@vicons/ionicons5'
 import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useSettingsStore } from '@/stores'
 import { invoke } from '@tauri-apps/api/core'
@@ -39,16 +36,6 @@ const { t } = useI18n()
 const currentTab = ref('params')
 const showSaveModal = ref(false)
 const saveMode = ref<'save' | 'save-as'>('save')
-
-const methodTypes: Record<string, 'success' | 'info' | 'warning' | 'error' | 'primary'> = {
-  GET: 'info',
-  POST: 'success',
-  PUT: 'warning',
-  DELETE: 'error',
-  PATCH: 'primary',
-  OPTIONS: 'info',
-  HEAD: 'info',
-}
 
 const methodOptions = [
   { label: 'GET', value: 'GET' },
@@ -109,21 +96,6 @@ const tabBadges = computed(() => ({
   params: requestStore.currentRequest.params.filter((p) => p.enabled).length,
   headers: requestStore.currentRequest.headers.filter((h) => h.enabled).length,
 }))
-
-const timeoutValue = computed({
-  get: () => settingsStore.settings?.timeout ?? 30000,
-  set: (val: number) => settingsStore.updateSettings({ timeout: val }),
-})
-
-const downloadPath = computed({
-  get: () => settingsStore.settings?.downloadPath ?? '',
-  set: (val: string) => settingsStore.updateSettings({ downloadPath: val }),
-})
-
-const downloadAsk = computed({
-  get: () => settingsStore.settings?.downloadAsk ?? true,
-  set: (val: boolean) => settingsStore.updateSettings({ downloadAsk: val }),
-})
 
 async function sendRequest(download = false) {
   if (!requestStore.currentRequest.url) {
@@ -547,38 +519,6 @@ onUnmounted(() => {
             />
           </div>
         </NTabPane>
-
-        <NTabPane name="settings" display-directive="show">
-          <template #tab>
-            <NIcon :component="SettingsOutline" />
-          </template>
-          <div class="tab-scroll-content">
-            <div class="settings-panel">
-              <div class="setting-item">
-                <label>{{ t('request.timeout') }}</label>
-                <NInputNumber
-                  v-model:value="timeoutValue"
-                  :min="1000"
-                  :max="300000"
-                  :step="1000"
-                  style="width: 150px"
-                />
-              </div>
-              <div class="setting-item">
-                <label>{{ t('request.downloadPath') }}</label>
-                <NInput
-                  v-model:value="downloadPath"
-                  :placeholder="t('request.downloadPathPlaceholder')"
-                  style="width: 250px"
-                />
-              </div>
-              <div class="setting-item">
-                <label>{{ t('request.downloadAsk') }}</label>
-                <NSwitch v-model:value="downloadAsk" />
-              </div>
-            </div>
-          </div>
-        </NTabPane>
       </NTabs>
     </div>
 
@@ -619,7 +559,7 @@ onUnmounted(() => {
 }
 
 .url-input :deep(.n-input__input-el) {
-  font-size: 14px;
+  font-size: var(--font-size-compact-lg);
   font-weight: 500;
 }
 
@@ -701,7 +641,7 @@ onUnmounted(() => {
 }
 
 .progress-label {
-  font-size: 11px;
+  font-size: var(--font-size-compact-sm);
   color: var(--n-text-color-3);
   min-width: 30px;
   font-weight: 500;
@@ -807,23 +747,6 @@ onUnmounted(() => {
   margin-left: 2px;
 }
 
-.settings-panel {
-  padding: 0;
-}
-
-.setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--n-border-color);
-}
-
-.setting-item label {
-  font-size: 14px;
-  font-weight: 500;
-}
-
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .url-bar {
@@ -881,14 +804,6 @@ onUnmounted(() => {
   .request-tabs-container :deep(.n-tabs-tab) {
     padding: 8px 12px;
     font-size: 14px;
-  }
-
-  .setting-item {
-    padding: 12px 0;
-  }
-
-  .setting-item label {
-    font-size: 15px;
   }
 }
 </style>

@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { NTabs, NTabPane, NButton, NIcon, NInput, NTag, NTooltip } from 'naive-ui'
+import { NTabs, NTabPane, NButton, NIcon, NInput, NTooltip, NDropdown } from 'naive-ui'
 import {
-  TrashOutline,
   ChevronBackOutline,
   ChevronForwardOutline,
-  CreateOutline,
 } from '@vicons/ionicons5'
 import { ref, computed, nextTick } from 'vue'
 import { useRequestStore, useEnvironmentStore } from '@/stores'
@@ -20,7 +18,6 @@ import { HttpMethodIcon, AppIcon } from '@/components/icons'
 import BatchOperationToolbar from '@/components/common/BatchOperationToolbar.vue'
 import BatchMoveDialog from '@/components/common/BatchMoveDialog.vue'
 import HistoryPanel from '@/components/history/HistoryPanel.vue'
-import EnvironmentManager from '@/components/environment/EnvironmentManager.vue'
 
 defineProps<{
   collapsed?: boolean
@@ -48,6 +45,70 @@ const editingType = ref<'collection' | 'environment' | 'request' | null>(null)
 
 const showBatchDialog = ref(false)
 const batchMode = ref<'copy' | 'move'>('move')
+
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuTarget = ref<{ id: string; type: 'collection' | 'request'; collectionId?: string } | null>(null)
+
+const collectionContextMenuOptions = [
+  { label: '重命名', key: 'rename' },
+  { label: '删除', key: 'delete' },
+]
+
+const requestContextMenuOptions = [
+  { label: '重命名', key: 'rename' },
+  { label: '删除', key: 'delete' },
+]
+
+function handleCollectionContextMenu(e: MouseEvent, collection: { id: string; name: string }) {
+  e.preventDefault()
+  contextMenuTarget.value = { id: collection.id, type: 'collection' }
+  contextMenuX.value = e.clientX
+  contextMenuY.value = e.clientY
+  showContextMenu.value = true
+}
+
+function handleRequestContextMenu(e: MouseEvent, request: { id: string; name: string }, collectionId: string) {
+  e.preventDefault()
+  contextMenuTarget.value = { id: request.id, type: 'request', collectionId }
+  contextMenuX.value = e.clientX
+  contextMenuY.value = e.clientY
+  showContextMenu.value = true
+}
+
+function handleContextMenuSelect(key: string) {
+  if (!contextMenuTarget.value) return
+
+  if (contextMenuTarget.value.type === 'collection') {
+    if (key === 'rename') {
+      const collection = requestStore.collections.find(c => c.id === contextMenuTarget.value!.id)
+      if (collection) {
+        startRename(collection.id, collection.name, 'collection')
+      }
+    } else if (key === 'delete') {
+      requestStore.deleteCollection(contextMenuTarget.value.id)
+    }
+  } else if (contextMenuTarget.value.type === 'request' && contextMenuTarget.value.collectionId) {
+    if (key === 'rename') {
+      const collection = requestStore.collections.find(c => c.id === contextMenuTarget.value!.collectionId)
+      const request = collection?.requests.find(r => r.id === contextMenuTarget.value!.id)
+      if (request) {
+        startRename(request.id, request.name, 'request')
+      }
+    } else if (key === 'delete') {
+      requestStore.deleteRequest(contextMenuTarget.value.collectionId, contextMenuTarget.value.id)
+    }
+  }
+
+  showContextMenu.value = false
+  contextMenuTarget.value = null
+}
+
+function handleContextMenuClickoutside() {
+  showContextMenu.value = false
+  contextMenuTarget.value = null
+}
 
 function toggleExpand(key: string) {
   if (expandedKeys.value.has(key)) {
@@ -96,14 +157,6 @@ function handleNewCollection() {
   requestStore.createCollection(t('collection.newCollection'))
 }
 
-function handleNewRequest() {
-  emit('new-request')
-}
-
-async function handleNewEnvironment() {
-  await environmentStore.createEnvironment(t('environment.newEnvironment'))
-}
-
 const filteredCollections = computed(() => {
   if (!searchQuery.value) return requestStore.collections
   const query = searchQuery.value.toLowerCase()
@@ -114,19 +167,11 @@ const filteredCollections = computed(() => {
   )
 })
 
-function deleteCollection(id: string) {
-  requestStore.deleteCollection(id)
-}
-
-function deleteRequest(collectionId: string, requestId: string) {
-  requestStore.deleteRequest(collectionId, requestId)
-}
-
 function isRequestActive(requestId: string): boolean {
   return requestStore.currentTab?.request.id === requestId
 }
 
-function startRename(id: string, name: string, type: 'collection' | 'environment') {
+function startRename(id: string, name: string, type: 'collection' | 'environment' | 'request') {
   editingId.value = id
   editingName.value = name
   editingType.value = type
@@ -198,14 +243,7 @@ function getCurrentCollectionId(): string | undefined {
             </span>
           </template>
         </NTabPane>
-        <NTabPane name="environments">
-          <template #tab>
-            <span class="tab-label">
-              <AppIcon type="environment" :size="16" />
-              {{ t('environment.environments') }}
-            </span>
-          </template>
-        </NTabPane>
+        
       </NTabs>
     </div>
 
@@ -222,15 +260,11 @@ function getCurrentCollectionId(): string | undefined {
         </template>
       </NInput>
       <NButton
-        size="small"
-        type="primary"
-        class="add-btn"
-        @click="
-          activeTab === 'collections'
-            ? handleNewCollection()
-            : handleNewEnvironment()
-        "
-      >
+          size="small"
+          type="primary"
+          class="add-btn"
+          @click="handleNewCollection()"
+        >
         <template #icon>
           <AppIcon type="plus" :size="14" />
         </template>
@@ -246,7 +280,11 @@ function getCurrentCollectionId(): string | undefined {
           @move="openBatchDialog('move')"
         />
         <template v-for="collection in filteredCollections" :key="collection.id">
-          <div class="list-item group" @click="toggleExpand(collection.id)">
+          <div
+            class="list-item group"
+            @click="toggleExpand(collection.id)"
+            @contextmenu="handleCollectionContextMenu($event, collection)"
+          >
             <div class="item-content">
               <AppIcon type="folder" :size="16" class="item-icon" />
               <template v-if="editingId === collection.id && editingType === 'collection'">
@@ -262,26 +300,8 @@ function getCurrentCollectionId(): string | undefined {
               </template>
               <template v-else>
                 <span class="item-name">{{ collection.name }}</span>
-                <NTag size="small" :bordered="false">{{ collection.requests.length }}</NTag>
+                <span class="item-count">{{ collection.requests.length }}</span>
               </template>
-            </div>
-            <div class="action-buttons">
-              <NButton
-                text
-                size="tiny"
-                class="action-btn"
-                @click.stop="startRename(collection.id, collection.name, 'collection')"
-              >
-                <AppIcon type="edit" :size="12" />
-              </NButton>
-              <NButton
-                text
-                size="tiny"
-                class="action-btn"
-                @click.stop="deleteCollection(collection.id)"
-              >
-                <AppIcon type="trash" :size="12" />
-              </NButton>
             </div>
           </div>
           <div v-if="expandedKeys.has(collection.id)" class="sub-list">
@@ -294,6 +314,7 @@ function getCurrentCollectionId(): string | undefined {
                 selected: requestStore.isInSelection(request.id),
               }"
               @click="selectRequest(request, collection.id)"
+              @contextmenu="handleRequestContextMenu($event, request, collection.id)"
             >
               <div
                 v-if="requestStore.isSelectionMode"
@@ -320,24 +341,6 @@ function getCurrentCollectionId(): string | undefined {
               <template v-else>
                 <span class="item-name">{{ request.name }}</span>
               </template>
-              <div class="action-buttons">
-                <NButton
-                  text
-                  size="tiny"
-                  class="action-btn"
-                  @click.stop="startRename(request.id, request.name, 'request')"
-                >
-                  <NIcon :component="CreateOutline" />
-                </NButton>
-                <NButton
-                  text
-                  size="tiny"
-                  class="action-btn"
-                  @click.stop="deleteRequest(collection.id, request.id)"
-                >
-                  <NIcon :component="TrashOutline" />
-                </NButton>
-              </div>
             </div>
           </div>
         </template>
@@ -351,10 +354,7 @@ function getCurrentCollectionId(): string | undefined {
         <HistoryPanel @select="selectHistory" />
       </div>
 
-      <!-- Environments Tab -->
-      <div v-if="activeTab === 'environments'" class="env-tab-container">
-        <EnvironmentManager />
-      </div>
+
     </div>
 
     <div class="sidebar-footer">
@@ -371,17 +371,28 @@ function getCurrentCollectionId(): string | undefined {
         </svg>
         <span class="logo-text">iApi</span>
       </div>
-      <NTooltip :show-arrow="false" placement="top">
-        <template #trigger>
-          <NButton text circle size="small" @click="handleToggle">
-            <template #icon>
-              <NIcon :component="collapsed ? ChevronForwardOutline : ChevronBackOutline" />
-            </template>
-          </NButton>
-        </template>
-        {{ collapsed ? t('common.expand') : t('common.collapse') }}
-      </NTooltip>
+      <div class="footer-actions">
+        <NTooltip :show-arrow="false" placement="top">
+          <template #trigger>
+            <NButton text circle size="small" @click="handleToggle">
+              <template #icon>
+                <NIcon :component="collapsed ? ChevronForwardOutline : ChevronBackOutline" />
+              </template>
+            </NButton>
+          </template>
+          {{ collapsed ? t('common.expand') : t('common.collapse') }}
+        </NTooltip>
+      </div>
     </div>
+
+    <NDropdown
+      :show="showContextMenu"
+      :options="contextMenuTarget?.type === 'request' ? requestContextMenuOptions : collectionContextMenuOptions"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      @select="handleContextMenuSelect"
+      @clickoutside="handleContextMenuClickoutside"
+    />
 
     <BatchMoveDialog
       v-model:show="showBatchDialog"
@@ -422,6 +433,7 @@ function getCurrentCollectionId(): string | undefined {
 .sidebar.collapsed {
   width: 48px;
   min-width: 48px;
+  max-width: 48px;
 }
 
 .sidebar.collapsed .sidebar-tabs,
@@ -436,7 +448,7 @@ function getCurrentCollectionId(): string | undefined {
 }
 
 .sidebar-tabs {
-  padding: 8px 6px 6px;
+  padding: 6px 4px 4px;
   border-bottom: 1px solid var(--n-border-color);
 }
 
@@ -444,25 +456,29 @@ function getCurrentCollectionId(): string | undefined {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-compact-sm);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-search-row {
-  padding: 6px;
+  padding: 4px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .search-input {
   flex: 1;
+  min-width: 0;
 }
 
 .add-btn {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
 }
 
@@ -480,7 +496,7 @@ function getCurrentCollectionId(): string | undefined {
 .list-container {
   height: 100%;
   overflow-y: auto;
-  padding: 4px;
+  padding: 2px;
 }
 
 .history-tab-container,
@@ -499,12 +515,13 @@ function getCurrentCollectionId(): string | undefined {
 .list-item {
   display: flex;
   align-items: center;
-  padding: 6px 8px;
+  padding: 5px 6px;
   margin: 1px 2px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  min-height: 32px;
 }
 
 .list-item:hover {
@@ -514,24 +531,25 @@ function getCurrentCollectionId(): string | undefined {
 
 .list-item.active {
   background: var(--n-color-hover);
-  box-shadow: inset 3px 0 0 var(--n-primary-color);
+  box-shadow: inset 2px 0 0 var(--n-primary-color);
 }
 
 .list-item.selected {
   background: var(--n-color-hover);
-  box-shadow: inset 3px 0 0 var(--n-primary-color);
+  box-shadow: inset 2px 0 0 var(--n-primary-color);
 }
 
 .selection-checkbox {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   margin-right: 4px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .selection-checkbox:hover {
@@ -541,7 +559,7 @@ function getCurrentCollectionId(): string | undefined {
 .item-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 }
@@ -549,7 +567,7 @@ function getCurrentCollectionId(): string | undefined {
 .item-icon {
   flex-shrink: 0;
   opacity: 0.7;
-  font-size: 14px;
+  font-size: var(--font-size-compact-md);
 }
 
 .item-name {
@@ -557,8 +575,17 @@ function getCurrentCollectionId(): string | undefined {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--font-size-compact-md);
   font-weight: 500;
+  line-height: 1.4;
+}
+
+.item-count {
+  flex-shrink: 0;
+  font-size: var(--font-size-compact-xs);
+  color: var(--n-text-color-3);
+  font-weight: 500;
+  padding: 0 4px;
 }
 
 .delete-btn {
@@ -572,9 +599,10 @@ function getCurrentCollectionId(): string | undefined {
 
 .action-buttons {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   opacity: 0;
   transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 
 .list-item:hover .action-buttons {
@@ -582,8 +610,13 @@ function getCurrentCollectionId(): string | undefined {
 }
 
 .action-btn {
-  padding: 4px;
-  border-radius: 4px;
+  padding: 2px;
+  border-radius: 3px;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .action-btn:hover {
@@ -593,38 +626,42 @@ function getCurrentCollectionId(): string | undefined {
 .rename-input {
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border: 1px solid var(--n-primary-color);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--n-color);
   color: var(--n-text-color);
-  font-size: 13px;
+  font-size: var(--font-size-compact-md);
   outline: none;
   box-shadow: 0 0 0 2px rgba(24, 160, 88, 0.1);
+  height: 24px;
 }
 
 .sub-list {
-  padding-left: 12px;
+  padding-left: 10px;
   margin-top: 1px;
-  border-left: 2px solid var(--n-border-color);
-  margin-left: 14px;
+  border-left: 1px solid var(--n-border-color);
+  margin-left: 12px;
 }
 
 .request-item {
-  gap: 8px;
-  padding-left: 8px;
+  gap: 6px;
+  padding-left: 6px;
 }
 
 .request-item :deep(.n-tag) {
-  font-size: 10px;
+  font-size: var(--font-size-compact-xs);
   font-weight: 600;
   letter-spacing: 0.5px;
+  padding: 1px 4px;
+  min-width: 28px;
+  text-align: center;
 }
 
 .history-item {
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 4px;
+  padding: 5px 6px;
 }
 
 .history-info {
@@ -632,27 +669,30 @@ function getCurrentCollectionId(): string | undefined {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .history-url {
-  font-size: 12px;
+  font-size: var(--font-size-compact-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  line-height: 1.3;
 }
 
 .history-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .time {
-  font-size: 11px;
+  font-size: var(--font-size-compact-xs);
   color: var(--n-text-color-3);
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .env-item {
@@ -660,16 +700,16 @@ function getCurrentCollectionId(): string | undefined {
 }
 
 .empty-state {
-  padding: 24px 12px;
+  padding: 20px 10px;
   text-align: center;
   color: var(--n-text-color-3);
-  font-size: 12px;
+  font-size: var(--font-size-compact-sm);
   line-height: 1.6;
 }
 
 .sidebar-footer {
-  height: 36px;
-  padding: 0 8px;
+  height: 32px;
+  padding: 0 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -681,14 +721,25 @@ function getCurrentCollectionId(): string | undefined {
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .logo-text {
-  font-size: 13px;
+  font-size: var(--font-size-compact-sm);
   font-weight: 700;
   color: var(--n-text-color-1);
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar.collapsed .sidebar-footer {
@@ -702,25 +753,8 @@ function getCurrentCollectionId(): string | undefined {
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
-  .sidebar-tabs {
-    padding: 6px 4px 4px;
-  }
-
-  .tab-label {
-    font-size: 11px;
-  }
-
-  .sidebar-search-row {
-    padding: 4px;
-  }
-
-  .list-item {
-    padding: 4px 6px;
-    margin: 1px 2px;
-  }
-
-  .item-name {
-    font-size: 11px;
+  .sidebar {
+    width: 200px;
   }
 }
 
@@ -728,36 +762,13 @@ function getCurrentCollectionId(): string | undefined {
   .sidebar {
     width: 48px !important;
     min-width: 48px !important;
+    max-width: 48px !important;
   }
 }
 
 @media (min-width: 1600px) {
-  .sidebar-tabs {
-    padding: 10px 8px 8px;
-  }
-
-  .tab-label {
-    font-size: 13px;
-  }
-
-  .sidebar-search-row {
-    padding: 8px;
-  }
-
-  .list-item {
-    padding: 8px 10px;
-  }
-
-  .item-name {
-    font-size: 13px;
-  }
-
-  .sidebar-footer {
-    height: 40px;
-  }
-
-  .logo-text {
-    font-size: 14px;
+  .sidebar {
+    width: 280px;
   }
 }
 
@@ -774,4 +785,18 @@ function getCurrentCollectionId(): string | undefined {
   display: flex;
   flex-direction: column;
 }
+
+/* 紧凑模式下的标签页文本隐藏 */
+@media (max-width: 1300px) {
+  .tab-label span:not(.icon) {
+    display: none;
+  }
+  
+  .tab-label {
+    justify-content: center;
+    gap: 0;
+  }
+}
+
+
 </style>

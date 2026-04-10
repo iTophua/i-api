@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NIcon, NDropdown, useMessage, NSplit } from 'naive-ui'
+import { NButton, NIcon, NDropdown, useMessage, NSplit, NModal } from 'naive-ui'
 import { CloseOutline, AddOutline } from '@vicons/ionicons5'
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useSettingsStore, useEnvironmentStore, useRequestStore } from '@/stores'
@@ -18,6 +18,7 @@ import OpenApiImportModal from '@/components/common/OpenApiImportModal.vue'
 import HarImportModal from '@/components/common/HarImportModal.vue'
 import SaveRequestModal from '@/components/common/SaveRequestModal.vue'
 import SettingsModal from '@/components/common/SettingsModal.vue'
+import EnvironmentManager from '@/components/environment/EnvironmentManager.vue'
 import { generateCode } from '@/utils/codeGenerator'
 import type { RequestTab } from '@/types'
 import { normalizeRequest } from '@/types'
@@ -37,6 +38,7 @@ const showOpenApiImport = ref(false)
 const showHarImport = ref(false)
 const showSaveRequest = ref(false)
 const showSettings = ref(false)
+const showEnvironmentManager = ref(false)
 
 const contextMenuOptions = [
   { label: '关闭', key: 'close' },
@@ -125,6 +127,22 @@ function newRequest() {
   requestStore.newRequest()
 }
 
+function toggleTheme() {
+  const currentTheme = settingsStore.settings.theme
+  if (currentTheme === 'dark') {
+    settingsStore.setTheme('light')
+  } else if (currentTheme === 'light') {
+    settingsStore.setTheme('dark')
+  } else {
+    // 如果是 system，切换到 dark
+    settingsStore.setTheme('dark')
+  }
+}
+
+function handleOpenEnvironmentManager() {
+  showEnvironmentManager.value = true
+}
+
 function handleContextMenu(e: MouseEvent, tabId: string) {
   e.preventDefault()
   contextMenuTabId.value = tabId
@@ -177,8 +195,9 @@ onMounted(async () => {
   await environmentStore.loadEnvironments()
   await requestStore.loadCollections()
 
-  if (settingsStore.appState.currentEnvironmentId) {
-    environmentStore.setCurrentEnvironment(settingsStore.appState.currentEnvironmentId)
+  const savedEnvId = localStorage.getItem('iapi-current-environment')
+  if (savedEnvId && environmentStore.environments.some(e => e.id === savedEnvId)) {
+    environmentStore.setCurrentEnvironment(savedEnvId)
   }
   collapsed.value = settingsStore.appState.sidebarCollapsed
 
@@ -220,6 +239,7 @@ useShortcuts([
       @toggle-theme="toggleTheme"
       @select-environment="environmentStore.setCurrentEnvironment"
       @open-settings="showSettings = true"
+      @open-environment-manager="handleOpenEnvironmentManager"
     />
     <div class="main-layout">
       <div class="sidebar-wrapper" :class="{ collapsed }">
@@ -360,6 +380,17 @@ useShortcuts([
     />
 
     <SettingsModal v-model:show="showSettings" />
+    <NModal
+      v-model:show="showEnvironmentManager"
+      preset="card"
+      style="width: 800px; height: 600px; max-width: 90vw; max-height: 90vh"
+      title="环境管理"
+      :bordered="false"
+      :mask-closable="true"
+      :focus-lock="false"
+    >
+      <EnvironmentManager />
+    </NModal>
   </div>
 </template>
 
@@ -380,7 +411,7 @@ useShortcuts([
 }
 
 .sidebar-wrapper {
-  width: 250px;
+  width: 300px;
   flex-shrink: 0;
   transition: width 0.2s ease;
   overflow: hidden;
