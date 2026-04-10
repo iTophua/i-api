@@ -10,6 +10,8 @@ const defaultSettings: Settings = {
   timeout: 30000,
   downloadPath: '',
   downloadAsk: true,
+  followRedirects: true,
+  verifySsl: true,
 }
 
 const defaultAppState: AppState = {

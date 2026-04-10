@@ -81,6 +81,28 @@ export const useEnvironmentStore = defineStore('environment', () => {
     }
   }
 
+  async function duplicateEnvironment(id: string): Promise<Environment | null> {
+    const sourceEnv = environments.value.find((e: Environment) => e.id === id)
+    if (!sourceEnv) return null
+
+    const newEnv: Environment = {
+      id: crypto.randomUUID(),
+      name: `${sourceEnv.name} (副本)`,
+      variables: JSON.parse(JSON.stringify(sourceEnv.variables)),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    try {
+      await invoke('save_environment', { environment: newEnv })
+      environments.value = [...environments.value, newEnv]
+      return newEnv
+    } catch (e) {
+      console.error('复制环境失败:', e)
+      throw e
+    }
+  }
+
   async function updateEnvironment(id: string, updates: Partial<Environment>) {
     const env = environments.value.find((e: Environment) => e.id === id)
     if (env) {
@@ -127,7 +149,11 @@ export const useEnvironmentStore = defineStore('environment', () => {
   async function addVariable(envId: string, variable: Variable) {
     const env = environments.value.find((e: Environment) => e.id === envId)
     if (env) {
-      env.variables.push(variable)
+      const variableWithId = {
+        ...variable,
+        id: variable.id || crypto.randomUUID(),
+      }
+      env.variables.push(variableWithId)
       await updateEnvironment(envId, { variables: env.variables })
     }
   }
@@ -353,6 +379,7 @@ export const useEnvironmentStore = defineStore('environment', () => {
     setManagerEnvironment,
     createEnvironment,
     renameEnvironment,
+    duplicateEnvironment,
     updateEnvironment,
     deleteEnvironment,
     addVariable,

@@ -22,6 +22,9 @@ const {
   storeBasicAuth,
   retrieveBasicAuth,
   storeApiKey,
+  deleteBearerToken,
+  deleteBasicAuth,
+  deleteApiKey,
 } = useAuthSecrets()
 
 const showBearerToken = ref(false)
@@ -131,6 +134,23 @@ const displayApiKeyValue = computed(() => {
   return apiKeyValue.value ? maskSensitiveValue(apiKeyValue.value) : ''
 })
 
+async function clearStoredCredentials() {
+  if (!props.requestId) return
+
+  if (safeAuth.value.type === 'bearer') {
+    await deleteBearerToken(props.requestId)
+  } else if (safeAuth.value.type === 'basic') {
+    await deleteBasicAuth(props.requestId)
+  } else if (safeAuth.value.type === 'apikey' && apiKeyKey.value) {
+    await deleteApiKey(props.requestId, apiKeyKey.value)
+  }
+}
+
+async function handleClearCredentials() {
+  await clearStoredCredentials()
+  emit('update:auth', { type: safeAuth.value.type })
+}
+
 onMounted(async () => {
   if (useSecureStorage.value && props.requestId) {
     if (safeAuth.value.type === 'bearer') {
@@ -180,6 +200,9 @@ watch(() => props.requestId, async (newId) => {
     <div v-if="authType !== 'none'" class="secure-storage-hint">
       <NIcon :component="LockClosedOutline" size="14" />
       <span class="hint-text">敏感信息将使用系统密钥库安全存储</span>
+      <NButton text size="tiny" type="warning" @click="handleClearCredentials">
+        清除已存储凭证
+      </NButton>
     </div>
 
     <div class="auth-config">
@@ -291,6 +314,7 @@ watch(() => props.requestId, async (newId) => {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .hint-text {

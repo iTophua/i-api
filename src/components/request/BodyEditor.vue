@@ -16,6 +16,7 @@ import type { RequestBody, BodyMode, KeyValuePair, FormDatum } from '@/types'
 import { formatJsonString } from '@/composables/useMonacoEditor'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readFile } from '@tauri-apps/plugin-fs'
+import VariableInput from '@/components/common/VariableInput.vue'
 
 const props = defineProps<{
   body: RequestBody | null
@@ -128,7 +129,7 @@ function addFormDataRow() {
   const current = safeBody.value.formData || []
   emit('update:body', {
     ...safeBody.value,
-    formData: [...current, { key: '', value: '', description: '', enabled: true, type: 'text' }],
+    formData: [...current, { id: crypto.randomUUID(), key: '', value: '', description: '', enabled: true, type: 'text' }],
   })
 }
 
@@ -153,23 +154,23 @@ const formDataColumns: DataTableColumns<FormDatum> = [
     title: 'Key',
     key: 'key',
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.key,
         placeholder: '参数名',
         size: 'small',
-        onUpdateValue: (val: string) => updateFormData(index, 'key', val),
+        'onUpdate:value': (val: string) => updateFormData(index, 'key', val),
       }),
   },
   {
     title: 'Value',
     key: 'value',
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.value,
         placeholder: row.type === 'file' ? '选择文件' : '参数值',
         size: 'small',
         disabled: row.type === 'file',
-        onUpdateValue: (val: string) => updateFormData(index, 'value', val),
+        'onUpdate:value': (val: string) => updateFormData(index, 'value', val),
       }),
   },
   {
@@ -209,7 +210,7 @@ function addUrlencodedRow() {
   const current = safeBody.value.urlencoded || []
   emit('update:body', {
     ...safeBody.value,
-    urlencoded: [...current, { key: '', value: '', description: '', enabled: true }],
+    urlencoded: [...current, { id: crypto.randomUUID(), key: '', value: '', description: '', enabled: true }],
   })
 }
 
@@ -234,22 +235,22 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
     title: 'Key',
     key: 'key',
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.key,
         placeholder: '参数名',
         size: 'small',
-        onUpdateValue: (val: string) => updateUrlencoded(index, 'key', val),
+        'onUpdate:value': (val: string) => updateUrlencoded(index, 'key', val),
       }),
   },
   {
     title: 'Value',
     key: 'value',
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.value,
         placeholder: '参数值',
         size: 'small',
-        onUpdateValue: (val: string) => updateUrlencoded(index, 'value', val),
+        'onUpdate:value': (val: string) => updateUrlencoded(index, 'value', val),
       }),
   },
   {
@@ -328,6 +329,7 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
           :data="safeBody.formData || []"
           :bordered="false"
           size="small"
+          :row-key="(row: FormDatum, index: number) => row.id || index"
         />
         <div class="table-toolbar">
           <NButton size="small" @click="addFormDataRow">
@@ -345,6 +347,7 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
           :data="safeBody.urlencoded || []"
           :bordered="false"
           size="small"
+          :row-key="(row: KeyValuePair, index: number) => row.id || index"
         />
         <div class="table-toolbar">
           <NButton size="small" @click="addUrlencodedRow">

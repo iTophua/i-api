@@ -110,3 +110,17 @@ npm run format           # Prettier 格式化
 - 覆盖率阈值: 语句/分支/函数/行 ≥ 80%
 - Tauri 特性: devtools 启用
 - 数据库: SQLite WAL 模式 + 外键约束 + 连接池(10)
+
+## RECENT FIXES
+
+### 2026-04-10
+
+| 文件 | 问题 | 修复 |
+| ---- | ---- | ---- |
+| `src/components/environment/EnvironmentManager.vue` | NPopconfirm 组件未导入，导致删除环境按钮不显示 | 添加 NPopconfirm 到 naive-ui 导入列表 |
+| `src/stores/environment.ts` | localStorage.getItem 缺少错误处理，隐私模式或存储满时可能崩溃 | 使用 IIFE + try-catch 包装，失败时回退到 'default' |
+| `src/components/sidebar/Sidebar.vue` | 集合展开后无视觉提示；选中请求时对应集合未自动展开；集合中请求单击无法打开；文件夹图标展开时未变化 | 添加 chevronDown/chevronRight 图标；添加 watch 自动展开当前请求所属集合；添加 @dblclick 双击打开请求；展开时使用 folderOpen 图标 |
+| `docs/environment-variables.md` | 缺少环境变量使用文档 | 新增环境变量使用指南文档 |
+| `src/components/request/RequestPanel.vue` | 变量替换只处理了 URL 和 Headers，未处理 params 和 body | 添加 params、body.raw、body.urlencoded、body.formData 的变量替换 |
+| `src/stores/environment.ts` | 缺少复制环境功能 | 新增 `duplicateEnvironment()` 方法，支持复制环境及其所有变量 |
+| `src/components/environment/EnvironmentManager.vue` | 缺少复制环境按钮 | 添加"复制环境"按钮，复制后自动选中新环境 |

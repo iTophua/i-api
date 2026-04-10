@@ -21,7 +21,14 @@ const requestStore = useRequestStore()
 
 const currentTab = ref('body')
 
-const response = computed<Response | null>(() => requestStore.currentResponse)
+const rawResponse = computed<Response | null>(() => requestStore.currentResponse)
+
+const isLarge = computed(() => rawResponse.value ? requestStore.isLargeResponse(rawResponse.value) : false)
+
+const response = computed<Response | null>(() => {
+  if (!rawResponse.value) return null
+  return requestStore.getOptimizedResponse(rawResponse.value)
+})
 
 const status = computed(() => response.value?.status || 0)
 const statusText = computed(() => response.value?.statusText || '')
@@ -135,6 +142,9 @@ const testResults = computed(() => {
           <span class="meta-label">Size</span>
           <span class="meta-value">{{ formattedSize }}</span>
         </span>
+        <NTag v-if="isLarge" type="warning" size="small">
+          大文件响应（已优化）
+        </NTag>
       </div>
       <div class="status-actions">
         <!-- 按钮已移动到 Body tab 中 -->

@@ -61,6 +61,16 @@ async function handleDeleteEnv(envId: string) {
   await environmentStore.deleteEnvironment(envId)
 }
 
+async function handleDuplicateEnv() {
+  if (!environmentStore.managerEnvironment) return
+  const newEnv = await environmentStore.duplicateEnvironment(
+    environmentStore.managerEnvironment.id
+  )
+  if (newEnv) {
+    environmentStore.setManagerEnvironment(newEnv.id)
+  }
+}
+
 function startEditingName() {
   if (!environmentStore.managerEnvironment) return
   editingEnvName.value = environmentStore.managerEnvironment.name
@@ -251,7 +261,13 @@ onMounted(async () => {
             </div>
             
             <div class="env-actions">
-              <NPopconfirm 
+              <NButton size="small" style="margin-right: 8px;" @click.stop="handleDuplicateEnv">
+                <template #icon>
+                  <AppIcon type="copy" :size="14" />
+                </template>
+                <span>复制环境</span>
+              </NButton>
+              <NPopconfirm
                 v-if="environmentStore.managerEnvironment.id !== 'default'"
                 positive-text="确定"
                 negative-text="取消"
@@ -276,7 +292,7 @@ onMounted(async () => {
                 :data="environmentStore.managerEnvironment?.variables || []"
                 :bordered="false"
                 size="small"
-                :row-key="(row: Variable) => row.key + row.value"
+                :row-key="(row: Variable) => row.id || row.key"
                 class="variables-table"
               />
               <div class="editor-toolbar">

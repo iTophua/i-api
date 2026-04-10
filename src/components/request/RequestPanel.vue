@@ -17,6 +17,7 @@ import { useSettingsStore } from '@/stores'
 import { invoke } from '@tauri-apps/api/core'
 import { useRequestStore, useEnvironmentStore, useHistoryStore } from '@/stores'
 import { useI18n } from '@/composables/useI18n'
+import { useUrlAutocomplete } from '@/composables/useUrlAutocomplete'
 import ParamsEditor from './ParamsEditor.vue'
 import HeadersEditor from './HeadersEditor.vue'
 import BodyEditor from './BodyEditor.vue'
@@ -32,10 +33,19 @@ const requestStore = useRequestStore()
 const environmentStore = useEnvironmentStore()
 const historyStore = useHistoryStore()
 const { t } = useI18n()
+const {
+  suggestions,
+  showSuggestions,
+  selectedIndex,
+  updateInput,
+  handleKeyDown: handleAutocompleteKeyDown,
+  hideSuggestions,
+} = useUrlAutocomplete()
 
 const currentTab = ref('params')
 const showSaveModal = ref(false)
 const saveMode = ref<'save' | 'save-as'>('save')
+const urlInputRef = ref<any>(null)
 
 const methodOptions = [
   { label: 'GET', value: 'GET' },
@@ -116,8 +126,40 @@ async function sendRequest(download = false) {
         ...h,
         value: environmentStore.replaceVariables(h.value),
       })),
+      params: requestStore.currentRequest.params.map((p) => ({
+        ...p,
+        value: environmentStore.replaceVariables(p.value),
+      })),
+      body: (() => {
+        const body = requestStore.currentRequest.body
+        if (body.mode === 'raw' && body.raw) {
+          return { ...body, raw: environmentStore.replaceVariables(body.raw) }
+        }
+        if (body.mode === 'urlencoded' && body.urlencoded) {
+          return {
+            ...body,
+            urlencoded: body.urlencoded.map((u) => ({
+              ...u,
+              value: environmentStore.replaceVariables(u.value),
+            })),
+          }
+        }
+        if (body.mode === 'form-data' && body.formData) {
+          return {
+            ...body,
+            formData: body.formData.map((f) => ({
+              ...f,
+              value: environmentStore.replaceVariables(f.value),
+            })),
+          }
+        }
+        return body
+      })(),
       returnBytes: download,
       timeout: settingsStore.settings?.timeout ?? 30000,
+      proxy: settingsStore.settings?.proxy?.enabled ? settingsStore.settings.proxy : undefined,
+      followRedirects: settingsStore.settings?.followRedirects,
+      verifySsl: settingsStore.settings?.verifySsl,
     }
 
     const response = await invoke<Response>('send_http_request', {
@@ -342,8 +384,33 @@ function handleSendRequest() {
   sendRequest()
 }
 
+function handleUrlInput(value: string) {
+  requestStore.updateUrl(value)
+  updateInput(value)
+}
+
+function handleUrlKeyDown(event: KeyboardEvent) {
+  const handled = handleAutocompleteKeyDown(event, (url: string) => {
+    requestStore.updateUrl(url)
+  })
+  if (!handled && event.key === 'Enter') {
+    event.preventDefault()
+    sendRequest()
+  }
+}
+
+function selectSuggestion(url: string) {
+  requestStore.updateUrl(url)
+  hideSuggestions()
+}
+
 onMounted(() => {
   window.addEventListener('send-request', handleSendRequest)
+  updateInput(requestStore.currentRequest.url)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('send-request', handleSendRequest)
 })
 
 onUnmounted(() => {
@@ -364,14 +431,36 @@ onUnmounted(() => {
         aria-label="HTTP 方法选择"
         @update:value="requestStore.updateMethod"
       />
-      <NInput
-        :value="requestStore.currentRequest.url"
-        :placeholder="t('request.enterUrl')"
-        class="url-input"
-        aria-label="请求 URL 输入"
-        @update:value="requestStore.updateUrl"
-        @keyup.enter="sendRequest()"
-      />
+      <div class="url-input-container">
+        <NInput
+          ref="urlInputRef"
+          :value="requestStore.currentRequest.url"
+          :placeholder="t('request.enterUrl')"
+          autocomplete="off"
+          spellcheck="false"
+          class="url-input"
+          aria-label="请求 URL 输入"
+          @update:value="handleUrlInput"
+          @keydown="handleUrlKeyDown"
+          @focus="showSuggestions && suggestions.length > 0 && (showSuggestions = true)"
+          @blur="setTimeout(hideSuggestions, 200)"
+        />
+        <div v-if="showSuggestions && suggestions.length > 0" class="url-suggestions">
+          <div
+            v-for="(suggestion, index) in suggestions"
+            :key="suggestion.url"
+            class="suggestion-item"
+            :class="{ selected: index === selectedIndex }"
+            @mousedown.prevent="selectSuggestion(suggestion.url)"
+          >
+            <span class="suggestion-method" :style="{ color: HTTP_METHOD_COLORS[suggestion.method as keyof typeof HTTP_METHOD_COLORS]?.color }">
+              {{ suggestion.method }}
+            </span>
+            <span class="suggestion-url">{{ suggestion.url }}</span>
+            <span class="suggestion-count">{{ suggestion.count }}次</span>
+          </div>
+        </div>
+      </div>
       <NButton
         v-if="requestStore.isLoading"
         type="error"
@@ -654,6 +743,61 @@ onUnmounted(() => {
 
 .url-bar {
   position: relative;
+}
+
+.url-input-container {
+  flex: 1;
+  position: relative;
+}
+
+.url-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--n-color);
+  border: 1px solid var(--n-border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  gap: 8px;
+}
+
+.suggestion-item:hover,
+.suggestion-item.selected {
+  background: var(--n-color-hover);
+}
+
+.suggestion-method {
+  font-weight: 600;
+  font-size: 12px;
+  min-width: 50px;
+}
+
+.suggestion-url {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.suggestion-count {
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  min-width: 40px;
+  text-align: right;
 }
 
 /* 调整下拉菜单位置，使其显示在发送按钮正下方 */

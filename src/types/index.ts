@@ -17,6 +17,7 @@ export const HTTP_METHOD_COLORS: Record<
 export type Locale = 'zh-CN' | 'en-US'
 
 export interface KeyValuePair {
+  id?: string
   key: string
   value: string
   description?: string
@@ -52,6 +53,7 @@ export type BodyMode = 'none' | 'form-data' | 'urlencoded' | 'raw' | 'binary'
 export type RawType = 'json' | 'xml' | 'text' | 'html'
 
 export interface FormDatum {
+  id?: string
   key: string
   value: string
   description?: string
@@ -82,8 +84,19 @@ export interface Request {
   preScript?: string
   postScript?: string
   returnBytes?: boolean
+  proxy?: ProxyConfig
+  followRedirects?: boolean
+  verifySsl?: boolean
   createdAt: string
   updatedAt: string
+}
+
+export interface ProxyConfig {
+  enabled: boolean
+  host: string
+  port: number
+  username?: string
+  password?: string
 }
 
 export interface Folder {
@@ -162,6 +175,8 @@ export interface Settings {
     username?: string
     password?: string
   }
+  followRedirects?: boolean
+  verifySsl?: boolean
 }
 
 export type TreeNode = Collection | Folder | Request
@@ -280,6 +295,9 @@ export function normalizeRequest(request: any): Request {
     auth: normalizeAuthConfig(request.auth),
     preScript: request.preScript || request.pre_script,
     postScript: request.postScript || request.post_script,
+    proxy: request.proxy,
+    followRedirects: request.followRedirects ?? request.follow_redirects,
+    verifySsl: request.verifySsl ?? request.verify_ssl,
     createdAt: safeParseDate(request.createdAt || request.created_at),
     updatedAt: safeParseDate(request.updatedAt || request.updated_at),
   }
@@ -327,6 +345,9 @@ export function toBackendRequest(request: Request): any {
       : null,
     pre_script: request.preScript,
     post_script: request.postScript,
+    proxy: request.proxy,
+    follow_redirects: request.followRedirects,
+    verify_ssl: request.verifySsl,
     created_at: request.createdAt,
     updated_at: request.updatedAt,
   }

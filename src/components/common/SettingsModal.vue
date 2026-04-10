@@ -11,6 +11,7 @@ import {
   NSwitch,
   NButton,
   NInput,
+  NAlert,
 } from 'naive-ui'
 import { useSettingsStore } from '@/stores'
 import { useI18n } from '@/composables/useI18n'
@@ -67,6 +68,20 @@ const downloadAsk = computed({
   get: () => localSettings.value.downloadAsk ?? true,
   set: (val: boolean) => {
     localSettings.value.downloadAsk = val
+  },
+})
+
+const followRedirects = computed({
+  get: () => localSettings.value.followRedirects ?? true,
+  set: (val: boolean) => {
+    localSettings.value.followRedirects = val
+  },
+})
+
+const verifySsl = computed({
+  get: () => localSettings.value.verifySsl ?? true,
+  set: (val: boolean) => {
+    localSettings.value.verifySsl = val
   },
 })
 
@@ -133,6 +148,22 @@ function handleReset() {
               <template #suffix>ms</template>
             </NInputNumber>
           </NFormItem>
+        </NForm>
+      </NTabPane>
+
+      <NTabPane name="network" tab="网络">
+        <NForm label-placement="left" label-width="120">
+          <NFormItem label="跟随重定向">
+            <NSwitch v-model:value="followRedirects" />
+            <span class="setting-hint">关闭后 3xx 响应不会自动跳转</span>
+          </NFormItem>
+          <NFormItem label="验证 SSL 证书">
+            <NSwitch v-model:value="verifySsl" />
+            <span class="setting-hint">关闭后可访问自签名证书的站点</span>
+          </NFormItem>
+          <NAlert title="安全提示" type="warning" style="margin-top: 12px">
+            关闭 SSL 验证存在安全风险，请在测试环境中使用。
+          </NAlert>
         </NForm>
       </NTabPane>
 
@@ -222,6 +253,12 @@ function handleReset() {
 }
 
 .proxy-input::placeholder {
+  color: var(--n-text-color-3);
+}
+
+.setting-hint {
+  margin-left: 8px;
+  font-size: 12px;
   color: var(--n-text-color-3);
 }
 

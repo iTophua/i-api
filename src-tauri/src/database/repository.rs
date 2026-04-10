@@ -157,6 +157,9 @@ impl DatabaseRepository {
                 timeout: None,
                 collection_id: row.get(11)?,
                 folder_id: row.get(12)?,
+                proxy: None,
+                follow_redirects: None,
+                verify_ssl: None,
                 created_at: row.get(13)?,
                 updated_at: row.get(14)?,
             })
@@ -202,6 +205,9 @@ impl DatabaseRepository {
                 timeout: None,
                 collection_id: row.get(11)?,
                 folder_id: row.get(12)?,
+                proxy: None,
+                follow_redirects: None,
+                verify_ssl: None,
                 created_at: row.get(13)?,
                 updated_at: row.get(14)?,
             })
@@ -536,6 +542,9 @@ impl DatabaseRepository {
                 timeout: None,
                 collection_id: row.get(11)?,
                 folder_id: row.get(12)?,
+                proxy: None,
+                follow_redirects: None,
+                verify_ssl: None,
                 created_at: row.get(13)?,
                 updated_at: row.get(14)?,
             })

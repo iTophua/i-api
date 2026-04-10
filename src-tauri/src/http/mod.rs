@@ -1,4 +1,4 @@
-use crate::models::{HttpRequest, HttpResponse, KeyValuePair};
+use crate::models::{HttpRequest, HttpResponse, KeyValuePair, ProxyConfig};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
@@ -46,21 +46,42 @@ static HTTP_CLIENT: Lazy<Arc<Client>> = Lazy::new(|| {
 static PENDING_REQUESTS: Lazy<Arc<RwLock<HashMap<String, tokio_util::sync::CancellationToken>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-pub async fn send_request(request: HttpRequest) -> Result<HttpResponse, String> {
-    let client = if let Some(timeout_ms) = request.timeout {
-        Arc::new(
-            Client::builder()
-                .timeout(Duration::from_millis(timeout_ms))
-                .connect_timeout(Duration::from_secs(10))
-                .pool_max_idle_per_host(10)
-                .pool_idle_timeout(Duration::from_secs(90))
-                .user_agent("iApi/0.1.0")
-                .build()
-                .map_err(|e| format!("创建HTTP客户端失败: {}", e))?,
-        )
+fn build_client(request: &HttpRequest) -> Result<Client, String> {
+    let mut builder = Client::builder();
+
+    if let Some(timeout_ms) = request.timeout {
+        builder = builder.timeout(Duration::from_millis(timeout_ms));
     } else {
-        HTTP_CLIENT.clone()
-    };
+        builder = builder.timeout(Duration::from_secs(30));
+    }
+
+    builder = builder
+        .connect_timeout(Duration::from_secs(10))
+        .pool_max_idle_per_host(10)
+        .pool_idle_timeout(Duration::from_secs(90))
+        .user_agent("iApi/0.1.0");
+
+    if let Some(follow_redirects) = request.follow_redirects {
+        if follow_redirects {
+            builder = builder.redirect(reqwest::redirect::Policy::limited(10));
+        } else {
+            builder = builder.redirect(reqwest::redirect::Policy::none());
+        }
+    } else {
+        builder = builder.redirect(reqwest::redirect::Policy::limited(10));
+    }
+
+    if let Some(verify_ssl) = request.verify_ssl {
+        if !verify_ssl {
+            builder = builder.danger_accept_invalid_certs(true);
+        }
+    }
+
+    builder.build().map_err(|e| format!("创建HTTP客户端失败: {}", e))
+}
+
+pub async fn send_request(request: HttpRequest) -> Result<HttpResponse, String> {
+    let client = build_client(&request).map(Arc::new)?;
     let request_id = request.id.clone();
 
     let cancellation_token = tokio_util::sync::CancellationToken::new();
@@ -84,12 +105,18 @@ async fn send_request_internal(
     request: HttpRequest,
     cancellation_token: tokio_util::sync::CancellationToken,
 ) -> Result<HttpResponse, String> {
-    let url = build_url_with_auth(&request.url, &request.params, &request.auth);
+    let mut url = build_url_with_auth(&request.url, &request.params, &request.auth);
+
+    if let Some(proxy) = &request.proxy {
+        if proxy.enabled {
+            url = apply_proxy(&url, proxy);
+        }
+    }
+
     let method = parse_method(&request.method);
 
     let mut req_builder = client.request(method, &url);
 
-    // 判断是否为 form-data，如果是则跳过 Content-Type header（让 reqwest 自动设置）
     let is_form_data = request.body.as_ref()
         .map(|b| b.body_mode == "form-data")
         .unwrap_or(false);
@@ -154,7 +181,6 @@ pub async fn cancel_request(request_id: &str) -> bool {
     }
 }
 
-// 流式响应处理
 pub async fn send_request_stream<F>(
     request: HttpRequest,
     mut on_chunk: F,
@@ -162,22 +188,9 @@ pub async fn send_request_stream<F>(
 where
     F: FnMut(Vec<u8>, HashMap<String, String>, u16, std::time::Instant) + Send + 'static,
 {
-    let client = if let Some(timeout_ms) = request.timeout {
-        Arc::new(
-            Client::builder()
-                .timeout(Duration::from_millis(timeout_ms))
-                .connect_timeout(Duration::from_secs(10))
-                .pool_max_idle_per_host(10)
-                .pool_idle_timeout(Duration::from_secs(90))
-                .user_agent("iApi/0.1.0")
-                .build()
-                .map_err(|e| format!("创建 HTTP 客户端失败：{}", e))?,
-        )
-    } else {
-        HTTP_CLIENT.clone()
-    };
-
+    let client = build_client(&request).map(Arc::new)?;
     let request_id = request.id.clone();
+
     let cancellation_token = tokio_util::sync::CancellationToken::new();
     {
         let mut pending = PENDING_REQUESTS.write().await;
@@ -203,7 +216,14 @@ async fn send_request_stream_internal<F>(
 where
     F: FnMut(Vec<u8>, HashMap<String, String>, u16, std::time::Instant) + Send + 'static,
 {
-    let url = build_url_with_auth(&request.url, &request.params, &request.auth);
+    let mut url = build_url_with_auth(&request.url, &request.params, &request.auth);
+
+    if let Some(proxy) = &request.proxy {
+        if proxy.enabled {
+            url = apply_proxy(&url, proxy);
+        }
+    }
+
     let method = parse_method(&request.method);
 
     let mut req_builder = client.request(method, &url);
@@ -229,7 +249,6 @@ where
                 .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
                 .collect();
 
-            // 发送响应头通知
             on_chunk(Vec::new(), headers.clone(), status, start);
 
             let cookies = extract_cookies(&headers);
@@ -250,13 +269,11 @@ where
                     }
                 }
 
-                // 每 8KB 发送一次块事件
                 if total_size % 8192 < chunk_vec.len() || chunk_vec.len() >= 8192 {
                     on_chunk(chunk_vec, headers.clone(), status, start);
                 }
             }
 
-            // 发送结束标记
             on_chunk(Vec::new(), headers.clone(), status, start);
 
             let response_time = start.elapsed().as_millis() as u64;
@@ -266,6 +283,20 @@ where
         _ = cancellation_token.cancelled() => {
             Err("请求已取消".to_string())
         }
+    }
+}
+
+fn apply_proxy(url: &str, proxy: &ProxyConfig) -> String {
+    let parsed_url = match reqwest::Url::parse(url) {
+        Ok(u) => u,
+        Err(_) => return url.to_string(),
+    };
+    let scheme = parsed_url.scheme();
+
+    match scheme {
+        "http" => format!("http://{}@{}:{}", proxy.host, proxy.port, url.trim_start_matches("http://")),
+        "https" => format!("https://{}@{}:{}", proxy.host, proxy.port, url.trim_start_matches("https://")),
+        _ => url.to_string(),
     }
 }
 
@@ -330,7 +361,6 @@ fn add_headers(
     let mut builder = builder;
 
     for header in headers.iter().filter(|h| h.enabled) {
-        // 跳过 Content-Type，让 reqwest 的 multipart 自动设置
         if skip_content_type && header.key.eq_ignore_ascii_case("Content-Type") {
             continue;
         }

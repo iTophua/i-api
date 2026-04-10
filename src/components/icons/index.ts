@@ -11,6 +11,7 @@ export type IconType =
   | 'request'
   | 'collection'
   | 'folder'
+  | 'folderOpen'
   | 'environment'
   | 'history'
   | 'settings'
@@ -34,5 +35,6 @@ export type IconType =
   | 'stop'
   | 'menu'
   | 'moreVertical'
+  | 'dragHandle'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD'

@@ -61,6 +61,60 @@ body,
     color var(--transition-base);
 }
 
+/* 禁用浏览器自动填充和拼写检查 */
+input,
+textarea,
+[contenteditable],
+[contenteditable="true"],
+[contenteditable="false"] {
+  autocomplete: off !important;
+  -webkit-autocomplete: off !important;
+  spellcheck: false !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input-autofill,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea-autofill {
+  autocomplete: off !important;
+  -webkit-autocomplete: off !important;
+  spellcheck: false !important;
+}
+
+input:not([autocomplete]),
+textarea:not([autocomplete]),
+input[autocomplete="off"],
+textarea[autocomplete="off"],
+input[spellcheck="false"],
+textarea[spellcheck="false"] {
+  autocomplete: off !important;
+  spellcheck: false !important;
+}
+
+.n-input input[type="text"],
+.n-input input[type="url"],
+.n-input input[type="search"],
+.n-input input:not([type]),
+.n-input textarea,
+.n-base-selection-input,
+.n-input-wrapper input,
+.n-input-wrapper textarea,
+.n-input .n-input__input,
+.n-input__input-el,
+.url-input input,
+.request-panel input,
+input.url-input,
+.n-input *,
+.n-input-wrapper * {
+  autocomplete: off !important;
+  -webkit-autocomplete: off !important;
+  spellcheck: false !important;
+}
+
 /* Webkit 滚动条 */
 ::-webkit-scrollbar {
   width: 8px;
@@ -96,5 +150,55 @@ body,
 
 [data-theme='dark'] * {
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* ===== Naive UI Tooltip 全局紧凑样式 ===== */
+.n-tooltip {
+  font-size: var(--font-size-compact-sm) !important;
+  --n-padding: 2px 6px !important;
+  --n-height: 22px !important;
+  --n-font-size: var(--font-size-compact-sm) !important;
+}
+
+.n-tooltip .n-tooltip-trigger {
+  font-size: var(--font-size-compact-sm) !important;
+}
+
+.n-tooltip .n-tooltip-content {
+  font-size: var(--font-size-compact-sm) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.n-tooltip .n-tooltip-content .n-tooltip-arrow {
+  display: none !important;
+}
+
+.n-tooltip .n-tooltip-content .n-tooltip-ref {
+  font-size: var(--font-size-compact-sm) !important;
+  padding: 1px 4px !important;
+  line-height: 1.2 !important;
+}
+
+.n-popover {
+  font-size: var(--font-size-compact-sm) !important;
+  --n-padding: 2px 6px !important;
+}
+
+.n-popover .n-popover-content {
+  font-size: var(--font-size-compact-sm) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ===== 下拉菜单紧凑样式 ===== */
+.n-dropdown {
+  font-size: var(--font-size-compact-sm) !important;
+}
+
+.n-dropdown .n-dropdown-menu .n-dropdown-item {
+  font-size: var(--font-size-compact-sm) !important;
+  padding: 4px 12px !important;
+  min-height: 28px !important;
 }
 </style>

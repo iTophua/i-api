@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { NTabs, NTabPane, NButton, NIcon, NInput, NTooltip, NDropdown } from 'naive-ui'
+import { NTabs, NTabPane, NButton, NIcon, NInput, NTooltip, NDropdown, NModal, NSpace } from 'naive-ui'
 import {
   ChevronBackOutline,
   ChevronForwardOutline,
 } from '@vicons/ionicons5'
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useRequestStore, useEnvironmentStore } from '@/stores'
 import { useI18n } from '@/composables/useI18n'
+import { useSidebarDrag } from '@/composables/useSidebarDrag'
 import type { Request, HttpMethod, History as RequestHistory } from '@/types'
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
@@ -46,10 +47,27 @@ const editingType = ref<'collection' | 'environment' | 'request' | null>(null)
 const showBatchDialog = ref(false)
 const batchMode = ref<'copy' | 'move'>('move')
 
+const showNewCollectionDialog = ref(false)
+const newCollectionName = ref('')
+
 const showContextMenu = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const contextMenuTarget = ref<{ id: string; type: 'collection' | 'request'; collectionId?: string } | null>(null)
+
+const {
+  dragState,
+  handleCollectionDragStart,
+  handleRequestDragStart,
+  getItemClass,
+  getItemStyle,
+  getDraggingStyle,
+  getDraggingItem,
+} = useSidebarDrag(
+  () => filteredCollections.value,
+  (from, to) => requestStore.reorderCollection(from, to),
+  (collectionId, from, to) => requestStore.reorderRequest(collectionId, from, to)
+)
 
 const collectionContextMenuOptions = [
   { label: '重命名', key: 'rename' },
@@ -130,6 +148,10 @@ function selectRequest(request: Request, collectionId?: string) {
   }
 }
 
+function openRequest(request: Request, collectionId?: string) {
+  requestStore.openRequest(request, collectionId)
+}
+
 function selectHistory(history: RequestHistory) {
   const now = new Date().toISOString()
   requestStore.openRequest(
@@ -153,18 +175,51 @@ function selectHistory(history: RequestHistory) {
   )
 }
 
-function handleNewCollection() {
-  requestStore.createCollection(t('collection.newCollection'))
+function openNewCollectionDialog() {
+  newCollectionName.value = t('collection.newCollection')
+  showNewCollectionDialog.value = true
+}
+
+function confirmNewCollection() {
+  if (newCollectionName.value.trim()) {
+    requestStore.createCollection(newCollectionName.value.trim())
+  }
+  showNewCollectionDialog.value = false
+  newCollectionName.value = ''
+}
+
+function cancelNewCollection() {
+  showNewCollectionDialog.value = false
+  newCollectionName.value = ''
 }
 
 const filteredCollections = computed(() => {
   if (!searchQuery.value) return requestStore.collections
   const query = searchQuery.value.toLowerCase()
-  return requestStore.collections.filter(
-    (c) =>
+  const isMethodSearch = HTTP_METHODS.some(m => m.toLowerCase() === query)
+
+  return requestStore.collections
+    .map(collection => ({
+      ...collection,
+      requests: collection.requests.filter(r =>
+        r.name.toLowerCase().includes(query) ||
+        r.url.toLowerCase().includes(query) ||
+        (isMethodSearch && r.method.toLowerCase() === query)
+      ),
+      folders: collection.folders.map(folder => ({
+        ...folder,
+        requests: folder.requests.filter(r =>
+          r.name.toLowerCase().includes(query) ||
+          r.url.toLowerCase().includes(query) ||
+          (isMethodSearch && r.method.toLowerCase() === query)
+        )
+      }))
+    }))
+    .filter(c =>
       c.name.toLowerCase().includes(query) ||
-      c.requests.some((r) => r.name.toLowerCase().includes(query))
-  )
+      c.requests.length > 0 ||
+      c.folders.some(f => f.requests.length > 0)
+    )
 })
 
 function isRequestActive(requestId: string): boolean {
@@ -221,6 +276,15 @@ function getCurrentCollectionId(): string | undefined {
   if (!currentTab?.collectionId) return undefined
   return currentTab.collectionId
 }
+
+watch(
+  () => requestStore.currentTab?.collectionId,
+  (collectionId) => {
+    if (collectionId && !expandedKeys.value.has(collectionId)) {
+      expandedKeys.value.add(collectionId)
+    }
+  },
+  { immediate: true });
 </script>
 
 <template>
@@ -263,7 +327,7 @@ function getCurrentCollectionId(): string | undefined {
           size="small"
           type="primary"
           class="add-btn"
-          @click="handleNewCollection()"
+          @click="openNewCollectionDialog()"
         >
         <template #icon>
           <AppIcon type="plus" :size="14" />
@@ -275,18 +339,54 @@ function getCurrentCollectionId(): string | undefined {
       <!-- Collections Tab -->
       <div v-if="activeTab === 'collections'" class="list-container">
         <BatchOperationToolbar
+          v-if="filteredCollections.length > 0"
           :collection="filteredCollections[0]"
           @copy="openBatchDialog('copy')"
           @move="openBatchDialog('move')"
         />
-        <template v-for="collection in filteredCollections" :key="collection.id">
+        <Teleport to="body">
           <div
-            class="list-item group"
-            @click="toggleExpand(collection.id)"
-            @contextmenu="handleCollectionContextMenu($event, collection)"
+            v-if="getDraggingItem()"
+            class="drag-ghost"
+            :style="getDraggingStyle()"
           >
             <div class="item-content">
-              <AppIcon type="folder" :size="16" class="item-icon" />
+              <AppIcon
+                :type="dragState.dragExpanded ? 'chevronDown' : 'chevronRight'"
+                :size="14"
+                class="expand-icon"
+              />
+              <AppIcon
+                :type="dragState.dragExpanded ? 'folderOpen' : 'folder'"
+                :size="16"
+                class="item-icon"
+              />
+              <span class="item-name">{{ dragState.dragName }}</span>
+            </div>
+          </div>
+        </Teleport>
+        <template v-for="(collection, collectionIndex) in filteredCollections" :key="collection.id">
+          <div
+            class="list-item group collection-item"
+            :class="getItemClass(collectionIndex, 'collection')"
+            :style="getItemStyle(collectionIndex, 'collection')"
+            :data-collection-id="collection.id"
+            tabindex="0"
+            @click="toggleExpand(collection.id)"
+            @contextmenu="handleCollectionContextMenu($event, collection)"
+            @mousedown="handleCollectionDragStart($event, collection, collectionIndex, expandedKeys.has(collection.id))"
+          >
+            <div class="item-content">
+              <AppIcon
+                :type="expandedKeys.has(collection.id) ? 'chevronDown' : 'chevronRight'"
+                :size="14"
+                class="expand-icon"
+              />
+              <AppIcon
+                :type="expandedKeys.has(collection.id) ? 'folderOpen' : 'folder'"
+                :size="16"
+                class="item-icon"
+              />
               <template v-if="editingId === collection.id && editingType === 'collection'">
                 <input
                   v-model="editingName"
@@ -303,45 +403,87 @@ function getCurrentCollectionId(): string | undefined {
                 <span class="item-count">{{ collection.requests.length }}</span>
               </template>
             </div>
+            <div class="item-actions" :class="{ 'is-hidden': editingId === collection.id }">
+              <NTooltip :show-arrow="false" placement="top">
+                <template #trigger>
+                  <NButton
+                    size="small"
+                    quaternary
+                    class="action-btn"
+                    @click.stop="startRename(collection.id, collection.name, 'collection')"
+                  >
+                    <template #icon>
+                      <AppIcon type="edit" class="btn-icon edit-icon" />
+                    </template>
+                  </NButton>
+                </template>
+                {{ t('common.rename') }}
+              </NTooltip>
+              <NTooltip :show-arrow="false" placement="top">
+                <template #trigger>
+                  <NButton
+                    size="small"
+                    quaternary
+                    class="action-btn delete-btn"
+                    @click.stop="requestStore.deleteCollection(collection.id)"
+                  >
+                    <template #icon>
+                      <AppIcon type="trash" class="btn-icon delete-icon" />
+                    </template>
+                  </NButton>
+                </template>
+                {{ t('common.delete') }}
+              </NTooltip>
+            </div>
           </div>
           <div v-if="expandedKeys.has(collection.id)" class="sub-list">
-            <div
-              v-for="request in collection.requests"
+            <template
+              v-for="(request, requestIndex) in collection.requests"
               :key="request.id"
-              class="list-item request-item"
-              :class="{
-                active: isRequestActive(request.id),
-                selected: requestStore.isInSelection(request.id),
-              }"
-              @click="selectRequest(request, collection.id)"
-              @contextmenu="handleRequestContextMenu($event, request, collection.id)"
             >
               <div
-                v-if="requestStore.isSelectionMode"
-                class="selection-checkbox"
-                @click.stop="toggleRequestSelection(request.id)"
+                class="list-item request-item"
+                :class="[
+                  getItemClass(requestIndex, 'request'),
+                  {
+                    active: isRequestActive(request.id),
+                    selected: requestStore.isInSelection(request.id),
+                  }
+                ]"
+                :style="getItemStyle(requestIndex, 'request')"
+                :data-collection-id="collection.id"
+                @click="selectRequest(request, collection.id)"
+                @dblclick="openRequest(request, collection.id)"
+                @contextmenu="handleRequestContextMenu($event, request, collection.id)"
+                @mousedown="handleRequestDragStart($event, request, collection.id, requestIndex)"
               >
-                <AppIcon
-                  :type="requestStore.isInSelection(request.id) ? 'check' : 'plus'"
-                  :size="14"
-                />
+                <div
+                  v-if="requestStore.isSelectionMode"
+                  class="selection-checkbox"
+                  @click.stop="toggleRequestSelection(request.id)"
+                >
+                  <AppIcon
+                    :type="requestStore.isInSelection(request.id) ? 'check' : 'plus'"
+                    :size="14"
+                  />
+                </div>
+                <HttpMethodIcon :method="request.method" :size="12" filled />
+                <template v-if="editingId === request.id && editingType === 'request'">
+                  <input
+                    v-model="editingName"
+                    :class="`rename-input-${request.id}`"
+                    class="rename-input"
+                    @blur="finishRename"
+                    @keyup.enter="finishRename"
+                    @keyup.escape="cancelRename"
+                    @click.stop
+                  />
+                </template>
+                <template v-else>
+                  <span class="item-name">{{ request.name }}</span>
+                </template>
               </div>
-              <HttpMethodIcon :method="request.method" :size="12" filled />
-              <template v-if="editingId === request.id && editingType === 'request'">
-                <input
-                  v-model="editingName"
-                  :class="`rename-input-${request.id}`"
-                  class="rename-input"
-                  @blur="finishRename"
-                  @keyup.enter="finishRename"
-                  @keyup.escape="cancelRename"
-                  @click.stop
-                />
-              </template>
-              <template v-else>
-                <span class="item-name">{{ request.name }}</span>
-              </template>
-            </div>
+            </template>
           </div>
         </template>
         <div v-if="filteredCollections.length === 0" class="empty-state">
@@ -401,6 +543,25 @@ function getCurrentCollectionId(): string | undefined {
       :mode="batchMode"
       @close="closeBatchDialog"
     />
+
+    <NModal
+      v-model:show="showNewCollectionDialog"
+      preset="card"
+      :title="t('collection.newCollection')"
+      style="width: 360px"
+    >
+      <div class="new-collection-dialog">
+        <NInput
+          v-model:value="newCollectionName"
+          :placeholder="t('collection.newCollection')"
+          @keyup.enter="confirmNewCollection"
+        />
+        <NSpace justify="end" style="margin-top: 16px">
+          <NButton @click="cancelNewCollection">{{ t('common.cancel') }}</NButton>
+          <NButton type="primary" @click="confirmNewCollection">{{ t('common.confirm') }}</NButton>
+        </NSpace>
+      </div>
+    </NModal>
   </div>
 </template>
 
@@ -570,6 +731,12 @@ function getCurrentCollectionId(): string | undefined {
   font-size: var(--font-size-compact-md);
 }
 
+.expand-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.2s ease;
+}
+
 .item-name {
   flex: 1;
   overflow: hidden;
@@ -586,41 +753,175 @@ function getCurrentCollectionId(): string | undefined {
   color: var(--n-text-color-3);
   font-weight: 500;
   padding: 0 4px;
+  transition: padding-right 0.2s;
 }
 
-.delete-btn {
-  opacity: 0;
-  transition: opacity 0.2s;
+.list-item:hover .item-count {
+  padding-right: 60px;
 }
 
-.list-item:hover .delete-btn {
-  opacity: 1;
-}
-
-.action-buttons {
+.item-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
-  gap: 2px;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.2s;
-  flex-shrink: 0;
+  pointer-events: none;
 }
 
-.list-item:hover .action-buttons {
+.list-item:hover .item-actions,
+.list-item:focus .item-actions,
+.list-item:focus-within .item-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.item-actions.is-hidden {
+  display: none;
+}
+
+.list-item:hover .btn-icon,
+.list-item:focus .btn-icon,
+.list-item:focus-within .btn-icon {
   opacity: 1;
 }
 
-.action-btn {
-  padding: 2px;
-  border-radius: 3px;
-  min-width: 20px;
-  height: 20px;
+.collection-item {
+  cursor: grab;
+  user-select: none;
+}
+
+.collection-item:active {
+  cursor: grabbing;
+}
+
+.collection-item.is-dragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.collection-item.is-pressing {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+.collection-item.is-displaced {
+  opacity: 1;
+}
+
+.request-item {
+  cursor: grab;
+  user-select: none;
+}
+
+.request-item:active {
+  cursor: grabbing;
+}
+
+.request-item.is-dragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.request-item.is-pressing {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+.request-item.is-displaced {
+  opacity: 1;
+}
+
+.drag-ghost {
+  position: fixed;
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  pointer-events: none;
+  background: var(--n-color);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--n-border-color);
+}
+
+.drag-ghost .item-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.drag-ghost .item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.list-item.dragging {
+  opacity: 0.5;
+  background: var(--n-color-hover);
+  transform: translateX(2px);
+}
+
+.list-item {
+  transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.sub-list .list-item {
+  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sub-list .list-item.dragging {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  position: relative;
+}
+
+.action-btn {
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-icon {
+  color: var(--n-text-color-2);
+}
+
 .action-btn:hover {
   background: var(--n-color-pressed);
+}
+
+.delete-icon {
+  color: #d03050;
+}
+
+.action-btn:hover .delete-icon {
+  color: #d03050;
+}
+
+.new-collection-dialog {
+  padding: 8px 0;
 }
 
 .rename-input {
@@ -647,6 +948,16 @@ function getCurrentCollectionId(): string | undefined {
 .request-item {
   gap: 6px;
   padding-left: 6px;
+}
+
+.request-item.dragging {
+  opacity: 0.5;
+  background: var(--n-color-hover);
+}
+
+.request-item:global(.dragging) {
+  opacity: 0.5;
+  background: var(--n-color-hover);
 }
 
 .request-item :deep(.n-tag) {

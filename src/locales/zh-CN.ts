@@ -5,6 +5,7 @@ export default {
     save: '保存',
     cancel: '取消',
     delete: '删除',
+    rename: '重命名',
     edit: '编辑',
     confirm: '确认',
     close: '关闭',

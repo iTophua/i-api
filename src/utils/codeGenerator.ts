@@ -8,22 +8,86 @@ export type CodeLanguage =
   | 'java'
   | 'go'
 
-export function generateCode(request: Request, language: CodeLanguage): string {
+export interface CodeGeneratorOptions {
+  replaceVariables?: boolean
+  includeDependencies?: boolean
+}
+
+export function generateCode(
+  request: Request,
+  language: CodeLanguage,
+  options: CodeGeneratorOptions = {}
+): string {
+  const { replaceVariables = true, includeDependencies = true } = options
+
+  const processedRequest = replaceVariables
+    ? {
+        ...request,
+        url: replaceEnvVariables(request.url),
+        headers: request.headers.map((h) => ({
+          ...h,
+          value: replaceEnvVariables(h.value),
+        })),
+      }
+    : request
+
+  let code = ''
   switch (language) {
     case 'curl':
-      return generateCurl(request)
+      code = generateCurl(processedRequest)
+      break
     case 'javascript-axios':
-      return generateAxios(request)
+      code = generateAxios(processedRequest)
+      break
     case 'javascript-fetch':
-      return generateFetch(request)
+      code = generateFetch(processedRequest)
+      break
     case 'python':
-      return generatePython(request)
+      code = generatePython(processedRequest)
+      break
     case 'java':
-      return generateJava(request)
+      code = generateJava(processedRequest)
+      break
     case 'go':
-      return generateGo(request)
+      code = generateGo(processedRequest)
+      break
     default:
-      return ''
+      code = ''
+  }
+
+  if (includeDependencies) {
+    const deps = getDependencies(language)
+    if (deps) {
+      code = `# 安装依赖\n${deps}\n\n# 代码\n${code}`
+    }
+  }
+
+  return code
+}
+
+function replaceEnvVariables(text: string): string {
+  const variablePattern = /\{\{([^}]+)\}\}/g
+  return text.replace(variablePattern, (match, varName) => {
+    return `<${varName}>`
+  })
+}
+
+function getDependencies(language: CodeLanguage): string | null {
+  switch (language) {
+    case 'curl':
+      return `# cURL 通常系统自带，无需安装`
+    case 'javascript-axios':
+      return `# npm install axios`
+    case 'javascript-fetch':
+      return `# Node.js 18+ 内置，无需安装\n# 旧版本: npm install node-fetch`
+    case 'python':
+      return `# pip install requests`
+    case 'java':
+      return `# Maven pom.xml 添加:\n# <dependency>\n#     <groupId>com.squareup.okhttp3</groupId>\n#     <artifactId>okhttp</artifactId>\n#     <version>4.12.0</version>\n# </dependency>`
+    case 'go':
+      return `# go mod init yourmodule\n# go get github.com/google/go-httpclient (可选)`
+    default:
+      return null
   }
 }
 
@@ -100,7 +164,7 @@ function generateFetch(request: Request): string {
 
   const enabledHeaders = request.headers.filter((h) => h.enabled)
   if (enabledHeaders.length > 0) {
-    const headersStr = enabledHeaders.map((h) => `'${h.key}': '${h.value}'`).join(',\n      ')
+    const headersStr = enabledHeaders.map((h) => `'${header.key}': '${header.value}'`).join(',\n      ')
     options.push(`headers: {\n      ${headersStr}\n    }`)
   }
 

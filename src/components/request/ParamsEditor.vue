@@ -4,6 +4,7 @@ import { AddOutline, TrashOutline } from '@vicons/ionicons5'
 import { h } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
 import type { KeyValuePair } from '@/types'
+import VariableInput from '@/components/common/VariableInput.vue'
 
 const props = defineProps<{
   params: KeyValuePair[]
@@ -20,7 +21,10 @@ function updateField(index: number, field: keyof KeyValuePair, value: string | b
 }
 
 function addRow() {
-  emit('update:params', [...props.params, { key: '', value: '', description: '', enabled: true }])
+  emit('update:params', [
+    ...props.params,
+    { id: crypto.randomUUID(), key: '', value: '', description: '', enabled: true },
+  ])
 }
 
 function deleteRow(index: number) {
@@ -43,34 +47,35 @@ const columns: DataTableColumns<KeyValuePair> = [
   {
     title: 'Key',
     key: 'key',
+    width: 150,
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.key,
         placeholder: '参数名',
         size: 'small',
-        onUpdateValue: (val: string) => updateField(index, 'key', val),
+        'onUpdate:value': (val: string) => updateField(index, 'key', val),
       }),
   },
   {
     title: 'Value',
     key: 'value',
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.value,
         placeholder: '参数值',
         size: 'small',
-        onUpdateValue: (val: string) => updateField(index, 'value', val),
+        'onUpdate:value': (val: string) => updateField(index, 'value', val),
       }),
   },
   {
     title: '描述',
     key: 'description',
     render: (row, index) =>
-      h(NInput, {
+      h(VariableInput, {
         value: row.description || '',
         placeholder: '描述（可选）',
         size: 'small',
-        onUpdateValue: (val: string) => updateField(index, 'description', val),
+        'onUpdate:value': (val: string) => updateField(index, 'description', val),
       }),
   },
   {
@@ -88,7 +93,13 @@ const columns: DataTableColumns<KeyValuePair> = [
 
 <template>
   <div class="params-editor">
-    <NDataTable :columns="columns" :data="params" :bordered="false" size="small" />
+    <NDataTable
+      :columns="columns"
+      :data="params"
+      :bordered="false"
+      size="small"
+      :row-key="(row: KeyValuePair, index: number) => row.id || index"
+    />
     <div class="add-row" @click="addRow">
       <NButton text type="primary" size="small">
         <template #icon>

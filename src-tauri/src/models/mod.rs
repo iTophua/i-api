@@ -107,8 +107,26 @@ pub struct HttpRequest {
     pub collection_id: Option<String>,
     #[serde(default)]
     pub folder_id: Option<String>,
+    #[serde(default)]
+    pub proxy: Option<ProxyConfig>,
+    #[serde(default)]
+    pub follow_redirects: Option<bool>,
+    #[serde(default)]
+    pub verify_ssl: Option<bool>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyConfig {
+    pub enabled: bool,
+    pub host: String,
+    pub port: u16,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,6 +179,9 @@ impl HttpRequest {
             timeout: None,
             collection_id: None,
             folder_id: None,
+            proxy: None,
+            follow_redirects: None,
+            verify_ssl: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -190,6 +211,9 @@ impl HttpRequest {
             timeout: None,
             collection_id: None,
             folder_id: None,
+            proxy: None,
+            follow_redirects: None,
+            verify_ssl: None,
             created_at: now.clone(),
             updated_at: now,
         }

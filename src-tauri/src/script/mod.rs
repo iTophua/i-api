@@ -44,6 +44,17 @@ enum Token {
     Test { name: String, assertion: Assertion },
     RequestUrl { url: String },
     RequestMethod { method: String },
+    ResponseGet { var_name: String, expression: ResponseExpression },
+}
+
+#[derive(Clone, Debug)]
+enum ResponseExpression {
+    Json,
+    Text,
+    Header(String),
+    Status,
+    Time,
+    Size,
 }
 
 #[derive(Clone, Debug)]
@@ -204,6 +215,101 @@ fn parse_script(script: &str) -> Vec<Token> {
         if let Some(end) = script[start..].find(';') {
             let method = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_uppercase();
             tokens.push(Token::RequestMethod { method });
+        }
+    }
+
+    // 解析 pm.response.json()
+    if let Some(json_pos) = script.find("pm.response.json()") {
+        let var_match = script[..json_pos].rfind(|c: char| !c.is_whitespace());
+        if let Some(var_pos) = var_match {
+            let before = &script[..=var_pos];
+            if let Some(eq_pos) = before.rfind('=') {
+                let var_name = script[eq_pos + 1..var_pos + 1].trim().to_string();
+                tokens.push(Token::ResponseGet {
+                    var_name,
+                    expression: ResponseExpression::Json,
+                });
+            }
+        }
+    }
+
+    // 解析 pm.response.text()
+    if let Some(text_pos) = script.find("pm.response.text()") {
+        let var_match = script[..text_pos].rfind(|c: char| !c.is_whitespace());
+        if let Some(var_pos) = var_match {
+            let before = &script[..=var_pos];
+            if let Some(eq_pos) = before.rfind('=') {
+                let var_name = script[eq_pos + 1..var_pos + 1].trim().to_string();
+                tokens.push(Token::ResponseGet {
+                    var_name,
+                    expression: ResponseExpression::Text,
+                });
+            }
+        }
+    }
+
+    // 解析 pm.response.headers.get("header-name")
+    let header_pattern = "pm.response.headers.get(";
+    let mut header_pos = 0;
+    while let Some(start) = script[header_pos..].find(header_pattern) {
+        let get_start = header_pos + start + header_pattern.len();
+        if let Some(end) = script[get_start..].find(')') {
+            let header_name = script[get_start..get_start + end]
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
+
+            let full_pos = header_pos + start;
+            let var_match = script[..full_pos].rfind(|c: char| !c.is_whitespace());
+            if let Some(var_pos) = var_match {
+                let before = &script[..=var_pos];
+                if let Some(eq_pos) = before.rfind('=') {
+                    let var_name = script[eq_pos + 1..var_pos + 1].trim().to_string();
+                    tokens.push(Token::ResponseGet {
+                        var_name,
+                        expression: ResponseExpression::Header(header_name),
+                    });
+                }
+            }
+
+            header_pos = get_start + end + 1;
+        } else {
+            break;
+        }
+    }
+
+    // 解析 pm.response.status
+    if script.contains("pm.response.status") {
+        let var_match = script.find("pm.response.status");
+        if let Some(status_pos) = var_match {
+            let before = &script[..status_pos];
+            if let Some(eq_pos) = before.rfind('=') {
+                let var_name = script[eq_pos + 1..status_pos].trim().to_string();
+                if !var_name.is_empty() && !var_name.contains('.') {
+                    tokens.push(Token::ResponseGet {
+                        var_name,
+                        expression: ResponseExpression::Status,
+                    });
+                }
+            }
+        }
+    }
+
+    // 解析 pm.response.time
+    if script.contains("pm.response.time") {
+        let var_match = script.find("pm.response.time");
+        if let Some(time_pos) = var_match {
+            let before = &script[..time_pos];
+            if let Some(eq_pos) = before.rfind('=') {
+                let var_name = script[eq_pos + 1..time_pos].trim().to_string();
+                if !var_name.is_empty() && !var_name.contains('.') {
+                    tokens.push(Token::ResponseGet {
+                        var_name,
+                        expression: ResponseExpression::Time,
+                    });
+                }
+            }
         }
     }
 
@@ -423,6 +529,25 @@ fn execute_tokens(
             Token::RequestMethod { method } => {
                 if let Some(req) = &mut request_ref {
                     req.method = method.clone();
+                }
+            }
+            Token::ResponseGet { var_name, expression } => {
+                if let Some(resp) = response {
+                    let value = match expression {
+                        ResponseExpression::Json => {
+                            serde_json::from_str::<Value>(&resp.body)
+                                .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
+                                .unwrap_or_default()
+                        }
+                        ResponseExpression::Text => resp.body.clone(),
+                        ResponseExpression::Header(header_name) => {
+                            resp.headers.get(header_name).cloned().unwrap_or_default()
+                        }
+                        ResponseExpression::Status => resp.status.to_string(),
+                        ResponseExpression::Time => resp.response_time.to_string(),
+                        ResponseExpression::Size => resp.response_size.to_string(),
+                    };
+                    context.variables.insert(var_name.clone(), value);
                 }
             }
         }

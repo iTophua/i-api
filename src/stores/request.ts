@@ -68,6 +68,40 @@ export const useRequestStore = defineStore('request', () => {
     return responses.value[activeTabId.value] || null
   })
 
+  const LARGE_RESPONSE_THRESHOLD = 5 * 1024 * 1024 // 5MB
+
+  function isLargeResponse(response: Response): boolean {
+    return response.responseSize > LARGE_RESPONSE_THRESHOLD
+  }
+
+  function getOptimizedResponse(response: Response): Response {
+    if (response.responseSize <= LARGE_RESPONSE_THRESHOLD) {
+      return response
+    }
+
+    const maxDisplaySize = 1 * 1024 * 1024 // 1MB
+    let optimizedBody = response.body
+
+    if (response.body.length > maxDisplaySize) {
+      optimizedBody = response.body.substring(0, maxDisplaySize) + '\n\n[... 响应内容已被截断以提升性能 ...]\n' +
+        `原始大小: ${formatBytes(response.responseSize)}`
+    }
+
+    return {
+      ...response,
+      body: optimizedBody,
+      bodyBytes: undefined,
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
   const currentCollection = computed(() => collections.value[0] || null)
 
   function openRequest(request: Request, collectionId?: string, isTemporary = false) {
@@ -341,6 +375,23 @@ export const useRequestStore = defineStore('request', () => {
       console.error('删除集合失败:', e)
       throw e
     }
+  }
+
+  function reorderCollection(fromIndex: number, toIndex: number) {
+    const newCollections = [...collections.value]
+    const [removed] = newCollections.splice(fromIndex, 1)
+    newCollections.splice(toIndex, 0, removed)
+    collections.value = newCollections
+  }
+
+  function reorderRequest(collectionId: string, fromIndex: number, toIndex: number) {
+    const collection = collections.value.find((c: Collection) => c.id === collectionId)
+    if (!collection) return
+
+    const newRequests = [...collection.requests]
+    const [removed] = newRequests.splice(fromIndex, 1)
+    newRequests.splice(toIndex, 0, removed)
+    collection.requests = newRequests
   }
 
   async function saveTemporaryRequest() {
@@ -682,6 +733,55 @@ export const useRequestStore = defineStore('request', () => {
     }
   }
 
+  function moveRequest(
+    requestId: string,
+    fromCollectionId: string,
+    toCollectionId: string,
+    fromIndex: number,
+    toIndex: number,
+    fromFolderId?: string,
+    toFolderId?: string
+  ) {
+    const fromCollection = collections.value.find((c) => c.id === fromCollectionId)
+    const toCollection = collections.value.find((c) => c.id === toCollectionId)
+
+    if (!fromCollection || !toCollection) return
+
+    if (fromCollectionId === toCollectionId && !fromFolderId && !toFolderId) {
+      const requests = [...fromCollection.requests]
+      const [removed] = requests.splice(fromIndex, 1)
+      requests.splice(toIndex, 0, removed)
+      fromCollection.requests = requests
+    } else if (fromFolderId && toFolderId && fromFolderId === toFolderId) {
+      const fromFolder = fromCollection.folders.find((f) => f.id === fromFolderId)
+      if (fromFolder) {
+        const requests = [...fromFolder.requests]
+        const [removed] = requests.splice(fromIndex, 1)
+        requests.splice(toIndex, 0, removed)
+        fromFolder.requests = requests
+      }
+    } else {
+      const getSourceRequests = (c: Collection, folderId?: string) => {
+        if (folderId) {
+          const folder = c.folders.find((f) => f.id === folderId)
+          return folder?.requests || []
+        }
+        return c.requests
+      }
+
+      const sourceRequests = getSourceRequests(fromCollection, fromFolderId)
+      const targetRequests = getSourceRequests(toCollection, toFolderId)
+
+      const [removed] = sourceRequests.splice(fromIndex, 1)
+      targetRequests.splice(toIndex, 0, removed)
+    }
+
+    invoke('save_collection', { collection: fromCollection }).catch(console.error)
+    if (fromCollectionId !== toCollectionId) {
+      invoke('save_collection', { collection: toCollection }).catch(console.error)
+    }
+  }
+
   function setPendingRequestId(id: string | null) {
     pendingRequestId.value = id
   }
@@ -723,6 +823,8 @@ export const useRequestStore = defineStore('request', () => {
     createFolder,
     deleteRequest,
     deleteCollection,
+    reorderCollection,
+    reorderRequest,
     saveTemporaryRequest,
     loadTemporaryRequest,
     clearTemporaryRequest,
@@ -738,6 +840,9 @@ export const useRequestStore = defineStore('request', () => {
     setUploadProgress,
     setDownloadProgress,
     resetProgress,
+    isLargeResponse,
+    getOptimizedResponse,
+    formatBytes,
     // 批量操作
     toggleSelection,
     selectRequest,
@@ -749,5 +854,6 @@ export const useRequestStore = defineStore('request', () => {
     batchDeleteRequests,
     batchMoveRequests,
     batchCopyRequests,
+    moveRequest,
   }
 })
