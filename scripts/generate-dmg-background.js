@@ -15,17 +15,19 @@ async function generateDmgBackground() {
   
   await sharp(svgBuffer)
     .resize(660, 400)
+    .removeAlpha()
     .png()
     .toFile(pngPath)
-  
-  console.log('✅ Generated dmg-background.png (660x400)')
-  
+
+  console.log('✅ Generated dmg-background.png (660x400, RGB)')
+
   await sharp(svgBuffer)
     .resize(1320, 800)
+    .removeAlpha()
     .png()
     .toFile(png2xPath)
-  
-  console.log('✅ Generated dmg-background@2x.png (1320x800)')
+
+  console.log('✅ Generated dmg-background@2x.png (1320x800, RGB)')
 }
 
 generateDmgBackground().catch(console.error)
