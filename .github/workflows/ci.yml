@@ -138,6 +138,15 @@ jobs:
           path: src-tauri/target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('src-tauri/**/Cargo.lock') }}
 
+      - name: Read release body
+        id: read-release-body
+        run: |
+          delimiter="$(openssl rand -hex 8)"
+          echo "body<<${delimiter}" >> $GITHUB_OUTPUT
+          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "${delimiter}" >> $GITHUB_OUTPUT
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0.5.25
         env:
@@ -145,7 +154,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'iApi v__VERSION__'
-          releaseBodyPath: CHANGELOG.md
+          releaseBody: ${{ steps.read-release-body.outputs.body }}
           releaseDraft: true
           prerelease: false
 
