@@ -2,6 +2,7 @@
 import { NModal, NCard, NSelect, NButton, NSpace, useMessage } from 'naive-ui'
 import { ref, computed, defineAsyncComponent } from 'vue'
 import type { Request } from '@/types'
+import type { Language } from '@/composables/useMonacoEditor'
 import { generateCode, type CodeLanguage } from '@/utils/codeGenerator'
 
 const MonacoEditor = defineAsyncComponent(() =>
@@ -35,14 +36,14 @@ const code = computed(() => {
   return generateCode(props.request, selectedLanguage.value)
 })
 
-const editorLanguage = computed(() => {
-  const langMap: Record<CodeLanguage, string> = {
+const editorLanguage = computed<Language>(() => {
+  const langMap: Record<CodeLanguage, Language> = {
     curl: 'plaintext',
     'javascript-axios': 'javascript',
     'javascript-fetch': 'javascript',
-    python: 'python',
-    java: 'java',
-    go: 'go',
+    python: 'plaintext',
+    java: 'plaintext',
+    go: 'plaintext',
   }
   return langMap[selectedLanguage.value] || 'plaintext'
 })
