@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::error::{IApiError, Result};
 use keyring::Entry;
 use serde::{Deserialize, Serialize};

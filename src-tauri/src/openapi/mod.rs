@@ -1,7 +1,10 @@
+#![allow(dead_code)]
+
 use crate::models::{HttpRequest, KeyValuePair, RequestBody};
 use serde_json::Value;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct OpenApiInfo {
     pub title: String,
     pub version: String,

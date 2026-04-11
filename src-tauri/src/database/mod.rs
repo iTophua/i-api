@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod optimizer;
 mod repository;
 
@@ -6,7 +8,7 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-pub use optimizer::{DatabaseStats, QueryBuilder, QueryOptimizer};
+pub use optimizer::QueryOptimizer;
 pub use repository::DatabaseRepository;
 
 /// 简单的数据库连接池
@@ -83,6 +85,7 @@ impl std::ops::Deref for PooledConn {
 }
 
 pub struct Database {
+    #[allow(dead_code)]
     pool: Arc<ConnectionPool>,
     pub repository: Arc<DatabaseRepository>,
 }
@@ -219,9 +222,5 @@ impl Database {
             pool: pool_arc,
             repository: repo,
         })
-    }
-
-    pub fn get_conn(&self) -> SqliteResult<PooledConn> {
-        self.pool.get()
     }
 }

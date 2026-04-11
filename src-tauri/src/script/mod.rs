@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -111,7 +113,7 @@ pub fn execute_pre_request_script(
 
 pub fn execute_post_request_script(
     script: &str,
-    request: &crate::models::HttpRequest,
+    _request: &crate::models::HttpRequest,
     response: &crate::models::HttpResponse,
     environment: &HashMap<String, String>,
 ) -> Result<ScriptContext, String> {

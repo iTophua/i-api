@@ -1,3 +1,5 @@
+#![allow(dead_code, private_interfaces)]
+
 use super::{ConnectionPool, PooledConn};
 use crate::models::{AppState, Collection, Environment, Folder, History, HttpRequest};
 use rusqlite::Result as SqliteResult;
@@ -9,6 +11,7 @@ pub struct DatabaseRepository {
 }
 
 impl DatabaseRepository {
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn new(pool: Arc<ConnectionPool>) -> Self {
         Self { pool }
     }

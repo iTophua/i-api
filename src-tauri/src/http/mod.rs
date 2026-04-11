@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::models::{HttpRequest, HttpResponse, KeyValuePair, ProxyConfig};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures_util::StreamExt;
@@ -8,10 +10,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-fn base64_encode(data: &[u8]) -> String {
+fn _base64_encode(data: &[u8]) -> String {
     STANDARD.encode(data)
 }
 
+#[allow(dead_code)]
 fn is_binary_response(headers: &HashMap<String, String>) -> bool {
     let content_type = headers
         .get("content-type")
@@ -29,6 +32,7 @@ fn is_binary_response(headers: &HashMap<String, String>) -> bool {
     !text_types.iter().any(|t| content_type.starts_with(t)) && !content_type.is_empty()
 }
 
+#[allow(dead_code)]
 static HTTP_CLIENT: Lazy<Arc<Client>> = Lazy::new(|| {
     Arc::new(
         Client::builder()
@@ -186,7 +190,7 @@ pub async fn cancel_request(request_id: &str) -> bool {
 
 pub async fn send_request_stream<F>(
     request: HttpRequest,
-    mut on_chunk: F,
+    on_chunk: F,
 ) -> Result<(String, HashMap<String, String>, u16, u64, usize), String>
 where
     F: FnMut(Vec<u8>, HashMap<String, String>, u16, std::time::Instant) + Send + 'static,
@@ -210,6 +214,7 @@ where
     result
 }
 
+#[allow(unused_variables)]
 async fn send_request_stream_internal<F>(
     client: Arc<Client>,
     request: HttpRequest,

@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 mod curl;
 mod database;
 mod error;
@@ -8,7 +10,6 @@ mod script;
 mod secure_storage;
 
 use database::Database;
-use error::IApiError;
 use models::{AppState, Collection, Environment, History, HttpRequest, HttpResponse};
 use script::{execute_post_request_script, execute_pre_request_script, ScriptContext};
 use secure_storage::SecureStorage;

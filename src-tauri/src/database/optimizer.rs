@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use rusqlite::{Connection, Result as SqliteResult};
 
 /// 数据库查询优化器
@@ -85,6 +87,7 @@ impl<'a> QueryOptimizer<'a> {
     }
 
     /// 批量插入优化 - 使用事务包装
+    #[allow(dead_code)]
     pub fn execute_batch_in_transaction<F>(&self, operation: F) -> SqliteResult<()>
     where
         F: FnOnce(&Connection) -> SqliteResult<()>,
@@ -96,6 +99,7 @@ impl<'a> QueryOptimizer<'a> {
     }
 
     /// 使用预编译语句提升重复查询性能
+    #[allow(dead_code)]
     pub fn prepare_cached_query<P, F, T>(&self, sql: &str, params: P, mapper: F) -> SqliteResult<T>
     where
         P: rusqlite::Params,
@@ -107,6 +111,7 @@ impl<'a> QueryOptimizer<'a> {
     }
 
     /// 获取数据库统计信息
+    #[allow(dead_code)]
     pub fn get_stats(&self) -> SqliteResult<DatabaseStats> {
         let mut stmt = self.conn.prepare(
             "SELECT 
@@ -131,27 +136,26 @@ impl<'a> QueryOptimizer<'a> {
     }
 
     /// 执行 VACUUM 优化数据库文件大小
+    #[allow(dead_code)]
     pub fn vacuum(&self) -> SqliteResult<()> {
         self.conn.execute_batch("VACUUM")?;
         Ok(())
     }
 
     /// 增量优化 - 只优化特定表
+    #[allow(dead_code)]
     pub fn optimize_table(&self, table_name: &str) -> SqliteResult<()> {
-        // 对该表进行分析
         self.conn
             .execute_batch(&format!("ANALYZE {}", table_name))?;
-
-        // 重建该表的索引
         self.conn
             .execute_batch(&format!("REINDEX {}", table_name))?;
-
         Ok(())
     }
 }
 
 /// 数据库统计信息
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DatabaseStats {
     pub collections: usize,
     pub requests: usize,
@@ -161,6 +165,7 @@ pub struct DatabaseStats {
 }
 
 /// 查询构建器 - 链式 API 构建复杂查询
+#[allow(dead_code)]
 pub struct QueryBuilder {
     table: String,
     columns: Vec<String>,
@@ -171,6 +176,7 @@ pub struct QueryBuilder {
 }
 
 impl QueryBuilder {
+    #[allow(dead_code)]
     pub fn new(table: &str) -> Self {
         Self {
             table: table.to_string(),
