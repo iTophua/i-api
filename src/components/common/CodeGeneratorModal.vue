@@ -4,7 +4,7 @@ import { ref, computed, shallowRef, onMounted } from 'vue'
 import type { Request } from '@/types'
 import { generateCode, type CodeLanguage } from '@/utils/codeGenerator'
 
-const MonacoEditor = shallowRef<any>(null)
+const MonacoEditor = shallowRef<unknown>(null)
 const message = useMessage()
 
 onMounted(async () => {

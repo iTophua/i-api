@@ -278,9 +278,9 @@ export function useEditorPerformance() {
   }
 
   function updateMemoryUsage() {
-    if ('memory' in performance && (performance as any).memory) {
-      memoryUsage.value =
-        Math.round(((performance as any).memory.usedJSHeapSize / 1048576) * 100) / 100
+    const perf = performance as Performance & { memory?: { usedJSHeapSize: number } }
+    if (perf.memory) {
+      memoryUsage.value = Math.round((perf.memory.usedJSHeapSize / 1048576) * 100) / 100
     }
   }
 

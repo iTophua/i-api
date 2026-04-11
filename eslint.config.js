@@ -6,7 +6,7 @@ import globals from 'globals'
 
 export default [
   {
-    ignores: ['dist/**', 'src-tauri/**', 'node_modules/**'],
+    ignores: ['dist/**', 'src-tauri/**', 'node_modules/**', '.playwright-mcp/**'],
   },
   {
     languageOptions: {
@@ -32,6 +32,13 @@ export default [
       'vue/multi-word-component-names': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'vue/no-v-html': 'warn',
+    },
+  },
+  {
+    files: ['**/VariableInput.vue'],
+    rules: {
+      'vue/no-v-html': 'off',
     },
   },
 ]

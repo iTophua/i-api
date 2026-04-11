@@ -30,7 +30,7 @@ const safeBody = computed<RequestBody>(() => {
   return body
 })
 
-const MonacoEditor = shallowRef<any>(null)
+const MonacoEditor = shallowRef<unknown>(null)
 const binaryFileName = ref<string>('')
 const binaryFileSize = ref<number>(0)
 

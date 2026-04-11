@@ -9,8 +9,8 @@ import ResponseStats from './ResponseStats.vue'
 import TestResultsPanel from './TestResultsPanel.vue'
 import LargeTextEditor from '@/components/common/LargeTextEditor.vue'
 
-const MonacoEditor = shallowRef<any>(null)
-const editorRef = ref<any>(null)
+const MonacoEditor = shallowRef<unknown>(null)
+const editorRef = ref<InstanceType<typeof LargeTextEditor> | null>(null)
 
 onMounted(async () => {
   const mod = await import('@/components/common/MonacoEditor.vue')

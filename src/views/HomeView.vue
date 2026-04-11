@@ -21,7 +21,7 @@ import SettingsModal from '@/components/common/SettingsModal.vue'
 import EnvironmentManager from '@/components/environment/EnvironmentManager.vue'
 import { generateCode } from '@/utils/codeGenerator'
 import type { RequestTab } from '@/types'
-import { normalizeRequest } from '@/types'
+import { normalizeRequest, type RawRequest } from '@/types'
 
 const message = useMessage()
 const settingsStore = useSettingsStore()
@@ -77,13 +77,13 @@ function handleImportSelect(key: string) {
   }
 }
 
-function handleCurlImport(request: any) {
+function handleCurlImport(request: RawRequest) {
   const normalizedRequest = normalizeRequest(request)
   requestStore.openRequest(normalizedRequest, undefined, true)
   message.success(t('import.importSuccess', { count: 1 }))
 }
 
-function handleRequestsImport(requests: any[], _source: string) {
+function handleRequestsImport(requests: RawRequest[], _source: string) {
   if (requests.length > 0) {
     const normalizedRequest = normalizeRequest(requests[0])
     requestStore.openRequest(normalizedRequest, undefined, true)

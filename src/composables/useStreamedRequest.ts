@@ -2,7 +2,7 @@ import { ref, onUnmounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import type { Response } from '@/types'
+import type { Response, RequestBody, AuthConfig } from '@/types'
 
 interface StreamOptions {
   requestId: string
@@ -10,8 +10,8 @@ interface StreamOptions {
   method: string
   params?: Array<{ key: string; value: string; enabled: boolean }>
   headers?: Array<{ key: string; value: string; enabled: boolean }>
-  body?: any
-  auth?: any
+  body?: RequestBody
+  auth?: AuthConfig
   timeout?: number
   returnBytes?: boolean
 }
@@ -64,7 +64,7 @@ export function useStreamedRequest() {
       // 监听响应头事件
       const unlistenHeaders = await listen(
         `${eventId}-headers`,
-        (event: any) => {
+        (event: { payload: { headers: Record<string, string>; status: number } }) => {
           if (callbacks.onHeaders) {
             callbacks.onHeaders(event.payload.headers, event.payload.status)
           }
@@ -75,8 +75,8 @@ export function useStreamedRequest() {
       // 监听数据块事件
       const unlistenChunk = await listen(
         `${eventId}-chunk`,
-        (event: any) => {
-          const payload = event.payload as StreamChunk
+        (event: { payload: StreamChunk }) => {
+          const payload = event.payload
           
           if (payload.chunk && payload.chunk.length > 0) {
             receivedBytes.value += payload.chunk.length
@@ -97,8 +97,8 @@ export function useStreamedRequest() {
       // 监听完成事件
       const unlistenComplete = await listen(
         `${eventId}-complete`,
-        (event: any) => {
-          const payload = event.payload as StreamComplete
+        (event: { payload: StreamComplete }) => {
+          const payload = event.payload
           
           isLoading.value = false
           progress.value = 100
@@ -125,7 +125,7 @@ export function useStreamedRequest() {
       // 监听错误事件
       const unlistenError = await listen(
         `${eventId}-error`,
-        (event: any) => {
+        (event: { payload: { error: string } }) => {
           isLoading.value = false
           error.value = event.payload.error
 

@@ -8,8 +8,8 @@ const mockCrypto = {
     }
     return arr
   },
-  subtle: {} as any,
-  webcrypto: {} as any,
+  subtle: {} as Record<string, never>,
+  webcrypto: {} as Record<string, never>,
 }
 
 Object.defineProperty(globalThis, 'crypto', {

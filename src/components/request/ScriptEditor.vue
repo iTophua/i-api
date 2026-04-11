@@ -2,7 +2,7 @@
 import { NCollapse, NCollapseItem, NButton } from 'naive-ui'
 import { computed, shallowRef, onMounted } from 'vue'
 
-const MonacoEditor = shallowRef<any>(null)
+const MonacoEditor = shallowRef<unknown>(null)
 
 onMounted(async () => {
   const mod = await import('@/components/common/MonacoEditor.vue')
@@ -16,6 +16,7 @@ const props = withDefaults(
   }>(),
   {
     type: 'test',
+    script: '',
   }
 )
 

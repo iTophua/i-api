@@ -1,6 +1,7 @@
 import { ref, watch, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
+import { createI18n } from 'vue-i18n'
 import type { Settings, AppState, Locale } from '@/types'
 
 const defaultSettings: Settings = {
@@ -18,9 +19,9 @@ const defaultAppState: AppState = {
   sidebarCollapsed: false,
 }
 
-let i18nInstance: any = null
+let i18nInstance: ReturnType<typeof createI18n> | null = null
 
-export function setI18nInstance(instance: any) {
+export function setI18nInstance(instance: ReturnType<typeof createI18n>) {
   i18nInstance = instance
 }
 

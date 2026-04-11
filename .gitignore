@@ -28,3 +28,6 @@ coverage/
 
 # Rust build artifacts
 src-tauri/target/
+
+# Playwright MCP debug files
+.playwright-mcp/
