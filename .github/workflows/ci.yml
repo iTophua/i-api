@@ -110,6 +110,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install pnpm
+        if: matrix.platform == 'windows'
+        run: npm install -g pnpm
+
       - name: Install system dependencies (Linux)
         if: matrix.platform == 'linux'
         run: |
