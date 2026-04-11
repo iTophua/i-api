@@ -92,6 +92,10 @@ pub struct Database {
 
 impl Database {
     pub fn new(app_data_dir: PathBuf) -> SqliteResult<Self> {
+        Self::new_with_path(app_data_dir, "iapi.db")
+    }
+
+    pub fn new_with_path(app_data_dir: PathBuf, db_filename: &str) -> SqliteResult<Self> {
         std::fs::create_dir_all(&app_data_dir).map_err(|e| {
             rusqlite::Error::ToSqlConversionFailure(Box::new(io::Error::new(
                 io::ErrorKind::Other,
@@ -99,7 +103,7 @@ impl Database {
             )))
         })?;
 
-        let db_path = app_data_dir.join("iapi.db");
+        let db_path = app_data_dir.join(db_filename);
         let pool = ConnectionPool::new(db_path.clone(), 10)?;
 
         // 初始化表结构

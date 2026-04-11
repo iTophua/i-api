@@ -244,6 +244,79 @@ impl QueryBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::Connection;
+
+    fn create_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("无法创建内存数据库");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS collections (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS folders (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                collection_id TEXT NOT NULL,
+                parent_folder_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (collection_id) REFERENCES collections(id),
+                FOREIGN KEY (parent_folder_id) REFERENCES folders(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS requests (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                method TEXT NOT NULL,
+                url TEXT NOT NULL,
+                params TEXT,
+                headers TEXT,
+                body TEXT,
+                auth TEXT,
+                pre_script TEXT,
+                post_script TEXT,
+                collection_id TEXT,
+                folder_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (collection_id) REFERENCES collections(id),
+                FOREIGN KEY (folder_id) REFERENCES folders(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS environments (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                variables TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS history (
+                id TEXT PRIMARY KEY,
+                request_id TEXT,
+                method TEXT NOT NULL,
+                url TEXT NOT NULL,
+                status INTEGER NOT NULL,
+                response_time INTEGER NOT NULL,
+                response_size INTEGER NOT NULL,
+                params TEXT,
+                headers TEXT,
+                body TEXT,
+                auth TEXT,
+                created_at TEXT NOT NULL
+            );
+            "#,
+        )
+        .expect("无法创建测试表");
+        conn
+    }
 
     #[test]
     fn test_query_builder() {
@@ -259,5 +332,119 @@ mod tests {
         assert!(sql.contains("WHERE request_id = ?"));
         assert!(sql.contains("ORDER BY created_at DESC"));
         assert!(sql.contains("LIMIT 10"));
+    }
+
+    #[test]
+    fn test_query_builder_minimal() {
+        let sql = QueryBuilder::new("requests").build();
+        assert_eq!(sql, "SELECT * FROM requests");
+    }
+
+    #[test]
+    fn test_enable_wal_mode() {
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join("iapi_test_wal.db");
+        let conn = Connection::open(&db_path).expect("无法创建临时数据库");
+        let optimizer = QueryOptimizer::new(&conn);
+        optimizer.enable_wal_mode().expect("启用 WAL 模式失败");
+        let mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .expect("查询 journal_mode 失败");
+        assert_eq!(mode.to_lowercase(), "wal");
+        drop(conn);
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    #[test]
+    fn test_enable_foreign_keys() {
+        let conn = create_test_db();
+        let optimizer = QueryOptimizer::new(&conn);
+        optimizer.enable_foreign_keys().expect("启用外键约束失败");
+        let enabled: i32 = conn
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .expect("查询 foreign_keys 失败");
+        assert_eq!(enabled, 1);
+    }
+
+    #[test]
+    fn test_set_busy_timeout() {
+        let conn = create_test_db();
+        let optimizer = QueryOptimizer::new(&conn);
+        optimizer.set_busy_timeout().expect("设置忙时超时失败");
+        let timeout: i32 = conn
+            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
+            .expect("查询 busy_timeout 失败");
+        assert_eq!(timeout, 5000);
+    }
+
+    #[test]
+    fn test_create_indexes() {
+        let conn = create_test_db();
+        let optimizer = QueryOptimizer::new(&conn);
+        optimizer.create_indexes().expect("创建索引失败");
+
+        let mut indexes = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='history'")
+            .expect("查询索引失败");
+        let index_names: Vec<String> = indexes
+            .query_map([], |row| row.get(0))
+            .expect("查询索引失败")
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(index_names.iter().any(|n| n.contains("idx_history_created_at")));
+    }
+
+    #[test]
+    fn test_database_stats() {
+        let conn = create_test_db();
+        let optimizer = QueryOptimizer::new(&conn);
+        let stats = optimizer.get_stats().expect("获取统计信息失败");
+        assert_eq!(stats.collections, 0);
+        assert_eq!(stats.requests, 0);
+        assert_eq!(stats.history, 0);
+    }
+
+    #[test]
+    fn test_optimize_journal_size() {
+        let conn = create_test_db();
+        let optimizer = QueryOptimizer::new(&conn);
+        optimizer.optimize_journal_size().expect("优化日志大小失败");
+
+        let wal_auto: i32 = conn
+            .query_row("PRAGMA wal_autocheckpoint", [], |row| row.get(0))
+            .expect("查询 wal_autocheckpoint 失败");
+        assert_eq!(wal_auto, 1000);
+    }
+
+    #[test]
+    fn test_execute_batch_in_transaction() {
+        let conn = create_test_db();
+        let optimizer = QueryOptimizer::new(&conn);
+
+        let result = optimizer.execute_batch_in_transaction(|tx| {
+            tx.execute("INSERT INTO collections (id, name, created_at, updated_at) VALUES ('1', 'Test', '2024-01-01', '2024-01-01')", [])?;
+            tx.execute("INSERT INTO collections (id, name, created_at, updated_at) VALUES ('2', 'Test2', '2024-01-01', '2024-01-01')", [])?;
+            Ok(())
+        });
+
+        assert!(result.is_ok());
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM collections", [], |row| row.get(0))
+            .expect("查询失败");
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_query_builder_with_like() {
+        let sql = QueryBuilder::new("requests")
+            .select(&["id", "name", "url"])
+            .where_like("name")
+            .order_by("updated_at", false)
+            .limit(20)
+            .build();
+
+        assert!(sql.contains("LIKE ?"));
+        assert!(sql.contains("ORDER BY updated_at ASC"));
+        assert!(sql.contains("LIMIT 20"));
     }
 }

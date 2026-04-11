@@ -23,7 +23,12 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("无法获取应用数据目录");
-            let db = Database::new(app_data_dir).expect("无法初始化数据库");
+            let db_file = if cfg!(debug_assertions) {
+                "iapi_dev.db"
+            } else {
+                "iapi.db"
+            };
+            let db = Database::new_with_path(app_data_dir, db_file).expect("无法初始化数据库");
             app.manage(Arc::new(db));
 
             if cfg!(debug_assertions) {
