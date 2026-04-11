@@ -391,7 +391,9 @@ mod tests {
             .expect("查询索引失败")
             .filter_map(|r| r.ok())
             .collect();
-        assert!(index_names.iter().any(|n| n.contains("idx_history_created_at")));
+        assert!(index_names
+            .iter()
+            .any(|n| n.contains("idx_history_created_at")));
     }
 
     #[test]
