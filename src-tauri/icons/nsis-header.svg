@@ -1,0 +1,27 @@
+<svg width="499" height="60" viewBox="0 0 499 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headerGradient" x1="0" y1="0" x2="499" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a0e27"/>
+      <stop offset="50%" stop-color="#1a1f3a"/>
+      <stop offset="100%" stop-color="#0f1428"/>
+    </linearGradient>
+  </defs>
+  
+  <rect width="499" height="60" fill="url(#headerGradient)"/>
+  
+  <g transform="translate(30, 30)">
+    <rect x="-15" y="-15" width="30" height="30" rx="6" fill="#3b82f6"/>
+    <path d="M-8 0L0 -4L8 0V4L0 8L-8 4V0Z" fill="white" fill-opacity="0.9"/>
+    <path d="M0 -4V8M-8 0L0 4L8 0" stroke="white" stroke-width="1.5" stroke-opacity="0.5"/>
+  </g>
+  
+  <text x="60" y="38" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif" font-size="20" font-weight="600" fill="white">
+    iApi 安装向导
+  </text>
+  
+  <text x="60" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif" font-size="10" fill="rgba(255, 255, 255, 0.6)">
+    API 调试工具
+  </text>
+  
+  <rect x="0" y="59" width="499" height="1" fill="#3b82f6" opacity="0.3"/>
+</svg>

@@ -26,7 +26,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://* http://*; worker-src 'self' blob:"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' 'unsafe-hashes' * data: blob:; img-src 'self' data: blob: https: http:; font-src 'self' data: blob:; connect-src 'self' https://* http://* ipc: blob: data:; worker-src 'self' blob:; frame-src 'self' blob: data:",
+      "dangerousDisableAssetCspModification": true
     }
   },
   "bundle": {
@@ -39,6 +40,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "publisher": "iApi Team",
+    "homepage": "https://github.com/iTophua/i-api",
+    "shortDescription": "轻量、快速、中文的 API 测试工具",
+    "longDescription": "iApi 是一款轻量级、快速、中文的 API 测试工具，支持请求发送、环境管理、集合组织、脚本执行等功能。",
+    "category": "DeveloperTool",
     "macOS": {
       "minimumSystemVersion": "10.13",
       "entitlements": null,
@@ -47,7 +53,7 @@
       "providerShortName": null,
       "signingIdentity": null,
       "dmg": {
-        "background": null,
+        "background": "icons/dmg-background.png",
         "windowPosition": {
           "x": 100,
           "y": 100
@@ -64,6 +70,22 @@
           "x": 480,
           "y": 170
         }
+      }
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
       }
     }
   }
