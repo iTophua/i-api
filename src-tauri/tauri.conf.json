@@ -51,26 +51,7 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": null,
-      "dmg": {
-        "background": "icons/dmg-background.png",
-        "windowPosition": {
-          "x": 100,
-          "y": 100
-        },
-        "windowSize": {
-          "width": 660,
-          "height": 400
-        },
-        "appPosition": {
-          "x": 180,
-          "y": 170
-        },
-        "applicationFolderPosition": {
-          "x": 480,
-          "y": 170
-        }
-      }
+      "signingIdentity": null
     },
     "windows": {
       "certificateThumbprint": null,
