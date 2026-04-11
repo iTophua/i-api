@@ -5,8 +5,12 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 
-(self as MonacoEnvironment).MonacoEnvironment = {
-  getWorker(_: unknown, label: string) {
+interface MonacoEnvironment {
+  getWorker(moduleId: string, label: string): Worker
+}
+
+(self as unknown as { MonacoEnvironment: MonacoEnvironment }).MonacoEnvironment = {
+  getWorker(_moduleId: string, label: string) {
     if (label === 'json') {
       return new jsonWorker()
     }
