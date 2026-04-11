@@ -38,8 +38,6 @@ onUnmounted(() => {
 </template>
 
 <style>
-@import './styles/theme.css';
-
 * {
   margin: 0;
   padding: 0;
