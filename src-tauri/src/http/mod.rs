@@ -26,8 +26,7 @@ fn is_binary_response(headers: &HashMap<String, String>) -> bool {
         "application/vnd.api+json",
     ];
 
-    !text_types.iter().any(|t| content_type.starts_with(t))
-        && !content_type.is_empty()
+    !text_types.iter().any(|t| content_type.starts_with(t)) && !content_type.is_empty()
 }
 
 static HTTP_CLIENT: Lazy<Arc<Client>> = Lazy::new(|| {
@@ -77,7 +76,9 @@ fn build_client(request: &HttpRequest) -> Result<Client, String> {
         }
     }
 
-    builder.build().map_err(|e| format!("创建HTTP客户端失败: {}", e))
+    builder
+        .build()
+        .map_err(|e| format!("创建HTTP客户端失败: {}", e))
 }
 
 pub async fn send_request(request: HttpRequest) -> Result<HttpResponse, String> {
@@ -117,7 +118,9 @@ async fn send_request_internal(
 
     let mut req_builder = client.request(method, &url);
 
-    let is_form_data = request.body.as_ref()
+    let is_form_data = request
+        .body
+        .as_ref()
         .map(|b| b.body_mode == "form-data")
         .unwrap_or(false);
 
@@ -227,7 +230,9 @@ where
     let method = parse_method(&request.method);
 
     let mut req_builder = client.request(method, &url);
-    let is_form_data = request.body.as_ref()
+    let is_form_data = request
+        .body
+        .as_ref()
         .map(|b| b.body_mode == "form-data")
         .unwrap_or(false);
 
@@ -294,8 +299,18 @@ fn apply_proxy(url: &str, proxy: &ProxyConfig) -> String {
     let scheme = parsed_url.scheme();
 
     match scheme {
-        "http" => format!("http://{}@{}:{}", proxy.host, proxy.port, url.trim_start_matches("http://")),
-        "https" => format!("https://{}@{}:{}", proxy.host, proxy.port, url.trim_start_matches("https://")),
+        "http" => format!(
+            "http://{}@{}:{}",
+            proxy.host,
+            proxy.port,
+            url.trim_start_matches("http://")
+        ),
+        "https" => format!(
+            "https://{}@{}:{}",
+            proxy.host,
+            proxy.port,
+            url.trim_start_matches("https://")
+        ),
         _ => url.to_string(),
     }
 }
@@ -328,7 +343,13 @@ fn build_url_with_auth(
 
     let query = all_params
         .iter()
-        .map(|p| format!("{}={}", urlencoding::encode(&p.key), urlencoding::encode(&p.value)))
+        .map(|p| {
+            format!(
+                "{}={}",
+                urlencoding::encode(&p.key),
+                urlencoding::encode(&p.value)
+            )
+        })
         .collect::<Vec<_>>()
         .join("&");
 

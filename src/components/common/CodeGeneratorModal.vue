@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { NModal, NCard, NSelect, NButton, NSpace, useMessage } from 'naive-ui'
-import { ref, computed, shallowRef, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import type { Request } from '@/types'
 import { generateCode, type CodeLanguage } from '@/utils/codeGenerator'
 
-const MonacoEditor = shallowRef<unknown>(null)
+const MonacoEditor = defineAsyncComponent(() =>
+  import('@/components/common/MonacoEditor.vue')
+)
 const message = useMessage()
-
-onMounted(async () => {
-  const mod = await import('@/components/common/MonacoEditor.vue')
-  MonacoEditor.value = mod.default
-})
 
 const props = defineProps<{
   show: boolean
@@ -88,7 +85,7 @@ function handleClose() {
 
         <div class="code-preview">
           <MonacoEditor
-            v-if="MonacoEditor.value"
+            v-if="MonacoEditor"
             :model-value="code"
             :language="editorLanguage"
             read-only

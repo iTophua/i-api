@@ -1,8 +1,8 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScriptContext {
@@ -28,7 +28,7 @@ impl Default for ScriptContext {
 }
 
 /// 脚本编译缓存
-static SCRIPT_CACHE: Lazy<Arc<dashmap::DashMap<String, CompiledScript>>> = 
+static SCRIPT_CACHE: Lazy<Arc<dashmap::DashMap<String, CompiledScript>>> =
     Lazy::new(|| Arc::new(dashmap::DashMap::new()));
 
 #[derive(Clone)]
@@ -39,12 +39,28 @@ struct CompiledScript {
 
 #[derive(Clone, Debug)]
 enum Token {
-    VariableSet { key: String, value: String },
-    EnvironmentSet { key: String, value: String },
-    Test { name: String, assertion: Assertion },
-    RequestUrl { url: String },
-    RequestMethod { method: String },
-    ResponseGet { var_name: String, expression: ResponseExpression },
+    VariableSet {
+        key: String,
+        value: String,
+    },
+    EnvironmentSet {
+        key: String,
+        value: String,
+    },
+    Test {
+        name: String,
+        assertion: Assertion,
+    },
+    RequestUrl {
+        url: String,
+    },
+    RequestMethod {
+        method: String,
+    },
+    ResponseGet {
+        var_name: String,
+        expression: ResponseExpression,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +96,7 @@ pub fn execute_pre_request_script(
 
     // 尝试从缓存获取编译后的脚本
     let compiled = compile_script(script);
-    
+
     // 环境变量替换
     let mut processed_script = script.to_string();
     for (key, value) in environment {
@@ -113,7 +129,12 @@ pub fn execute_post_request_script(
 
     // 编译并执行脚本
     let compiled = compile_script(&processed_script);
-    execute_tokens(&compiled.tokens, std::ptr::null_mut(), Some(response), &mut context);
+    execute_tokens(
+        &compiled.tokens,
+        std::ptr::null_mut(),
+        Some(response),
+        &mut context,
+    );
 
     Ok(context)
 }
@@ -121,7 +142,7 @@ pub fn execute_post_request_script(
 /// 编译脚本（带缓存）
 fn compile_script(source: &str) -> CompiledScript {
     let cache_key = format!("{:x}", md5::compute(source.as_bytes()));
-    
+
     if let Some(cached) = SCRIPT_CACHE.get(&cache_key) {
         return cached.clone();
     }
@@ -185,10 +206,10 @@ fn parse_script(script: &str) -> Vec<Token> {
                 .trim_matches('"')
                 .trim_matches('\'')
                 .to_string();
-            
+
             let assertion = parse_assertion(&script[test_start + name_end..]);
             tokens.push(Token::Test { name, assertion });
-            
+
             pos = test_start + name_end;
             if let Some(func_end) = script[pos..].find("});") {
                 pos += func_end + 3;
@@ -204,7 +225,11 @@ fn parse_script(script: &str) -> Vec<Token> {
     if let Some(url_start) = script.find("pm.request.url = ") {
         let start = url_start + "pm.request.url = ".len();
         if let Some(end) = script[start..].find(';') {
-            let url = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_string();
+            let url = script[start..start + end]
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
             tokens.push(Token::RequestUrl { url });
         }
     }
@@ -213,7 +238,11 @@ fn parse_script(script: &str) -> Vec<Token> {
     if let Some(method_start) = script.find("pm.request.method = ") {
         let start = method_start + "pm.request.method = ".len();
         if let Some(end) = script[start..].find(';') {
-            let method = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_uppercase();
+            let method = script[start..start + end]
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_uppercase();
             tokens.push(Token::RequestMethod { method });
         }
     }
@@ -322,18 +351,18 @@ fn find_matching_paren(s: &str) -> Option<usize> {
     let mut in_single_quote = false;
     let mut in_double_quote = false;
     let mut escape_next = false;
-    
+
     for (i, ch) in s.chars().enumerate() {
         if escape_next {
             escape_next = false;
             continue;
         }
-        
+
         if ch == '\\' && (in_single_quote || in_double_quote) {
             escape_next = true;
             continue;
         }
-        
+
         if !in_single_quote && !in_double_quote {
             if ch == '"' {
                 in_double_quote = true;
@@ -353,7 +382,7 @@ fn find_matching_paren(s: &str) -> Option<usize> {
             in_double_quote = false;
         }
     }
-    
+
     None
 }
 
@@ -363,19 +392,19 @@ fn parse_function_args(args: &str) -> Option<(String, String)> {
     let mut in_double_quote = false;
     let mut escape_next = false;
     let mut comma_pos = None;
-    
+
     // 找到第一个不在引号内的逗号
     for (i, ch) in args.chars().enumerate() {
         if escape_next {
             escape_next = false;
             continue;
         }
-        
+
         if ch == '\\' && (in_single_quote || in_double_quote) {
             escape_next = true;
             continue;
         }
-        
+
         if !in_single_quote && !in_double_quote {
             if ch == '"' {
                 in_double_quote = true;
@@ -391,11 +420,19 @@ fn parse_function_args(args: &str) -> Option<(String, String)> {
             in_double_quote = false;
         }
     }
-    
+
     let comma_pos = comma_pos?;
-    let key = args[..comma_pos].trim().trim_matches('"').trim_matches('\'').to_string();
-    let value = args[comma_pos + 1..].trim().trim_matches('"').trim_matches('\'').to_string();
-    
+    let key = args[..comma_pos]
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
+    let value = args[comma_pos + 1..]
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
+
     Some((key, value))
 }
 
@@ -404,18 +441,18 @@ fn find_closing_quote_and_comma(s: &str) -> Option<usize> {
     let mut in_single_quote = false;
     let mut in_double_quote = false;
     let mut escape_next = false;
-    
+
     for (i, ch) in s.chars().enumerate() {
         if escape_next {
             escape_next = false;
             continue;
         }
-        
+
         if ch == '\\' && (in_single_quote || in_double_quote) {
             escape_next = true;
             continue;
         }
-        
+
         if !in_single_quote && !in_double_quote {
             if ch == '"' {
                 in_double_quote = true;
@@ -430,13 +467,13 @@ fn find_closing_quote_and_comma(s: &str) -> Option<usize> {
             // 在引号内的逗号，继续
             continue;
         }
-        
+
         // 如果刚关闭引号且下一个字符是逗号
         if !in_single_quote && !in_double_quote && i + 1 < s.len() && s[i + 1..].starts_with(',') {
             return Some(i + 1);
         }
     }
-    
+
     None
 }
 
@@ -483,7 +520,11 @@ fn parse_assertion(script: &str) -> Assertion {
         if let Some(header_start) = script.find("pm.response.to.have.header(") {
             let start = header_start + "pm.response.to.have.header(".len();
             if let Some(end) = script[start..].find(')') {
-                let header = script[start..start + end].trim().trim_matches('"').trim_matches('\'').to_string();
+                let header = script[start..start + end]
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
                 return Assertion::HasHeader(header);
             }
         }
@@ -499,7 +540,11 @@ fn execute_tokens(
     response: Option<&crate::models::HttpResponse>,
     context: &mut ScriptContext,
 ) {
-    let mut request_ref = if request.is_null() { None } else { Some(unsafe { &mut *request }) };
+    let mut request_ref = if request.is_null() {
+        None
+    } else {
+        Some(unsafe { &mut *request })
+    };
 
     for token in tokens {
         match token {
@@ -513,11 +558,15 @@ fn execute_tokens(
                 let start = std::time::Instant::now();
                 let passed = evaluate_assertion(assertion, response);
                 let duration = start.elapsed().as_millis() as u64;
-                
+
                 context.test_results.push(TestResult {
                     name: name.clone(),
                     passed,
-                    error: if passed { None } else { Some("断言失败".to_string()) },
+                    error: if passed {
+                        None
+                    } else {
+                        Some("断言失败".to_string())
+                    },
                     duration_ms: Some(duration),
                 });
             }
@@ -531,14 +580,15 @@ fn execute_tokens(
                     req.method = method.clone();
                 }
             }
-            Token::ResponseGet { var_name, expression } => {
+            Token::ResponseGet {
+                var_name,
+                expression,
+            } => {
                 if let Some(resp) = response {
                     let value = match expression {
-                        ResponseExpression::Json => {
-                            serde_json::from_str::<Value>(&resp.body)
-                                .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
-                                .unwrap_or_default()
-                        }
+                        ResponseExpression::Json => serde_json::from_str::<Value>(&resp.body)
+                            .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
+                            .unwrap_or_default(),
                         ResponseExpression::Text => resp.body.clone(),
                         ResponseExpression::Header(header_name) => {
                             resp.headers.get(header_name).cloned().unwrap_or_default()
@@ -555,7 +605,10 @@ fn execute_tokens(
 }
 
 /// 评估断言
-fn evaluate_assertion(assertion: &Assertion, response: Option<&crate::models::HttpResponse>) -> bool {
+fn evaluate_assertion(
+    assertion: &Assertion,
+    response: Option<&crate::models::HttpResponse>,
+) -> bool {
     let Some(response) = response else {
         return false;
     };

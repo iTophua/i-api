@@ -1,7 +1,7 @@
 import { ref, watch, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
-import { createI18n } from 'vue-i18n'
+import { createI18nInstance } from '@/locales'
 import type { Settings, AppState, Locale } from '@/types'
 
 const defaultSettings: Settings = {
@@ -19,9 +19,9 @@ const defaultAppState: AppState = {
   sidebarCollapsed: false,
 }
 
-let i18nInstance: ReturnType<typeof createI18n> | null = null
+let i18nInstance: ReturnType<typeof createI18nInstance> | null = null
 
-export function setI18nInstance(instance: ReturnType<typeof createI18n>) {
+export function setI18nInstance(instance: ReturnType<typeof createI18nInstance>) {
   i18nInstance = instance
 }
 
@@ -54,7 +54,7 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value.language = language
     localStorage.setItem('iapi-locale', language)
     if (i18nInstance) {
-      i18nInstance.global.locale.value = language
+      ;(i18nInstance.global.locale as unknown as { value: Locale }).value = language
       document.documentElement.setAttribute('lang', language)
     }
   }

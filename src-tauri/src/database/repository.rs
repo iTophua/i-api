@@ -23,18 +23,22 @@ impl DatabaseRepository {
         let conn = self.get_conn()?;
         let tx = conn.unchecked_transaction()?;
 
-        let params_json = history.params.as_ref().map(|p| {
-            serde_json::to_string(p).unwrap_or_default()
-        });
-        let headers_json = history.headers.as_ref().map(|h| {
-            serde_json::to_string(h).unwrap_or_default()
-        });
-        let body_json = history.body.as_ref().map(|b| {
-            serde_json::to_string(b).unwrap_or_default()
-        });
-        let auth_json = history.auth.as_ref().map(|a| {
-            serde_json::to_string(a).unwrap_or_default()
-        });
+        let params_json = history
+            .params
+            .as_ref()
+            .map(|p| serde_json::to_string(p).unwrap_or_default());
+        let headers_json = history
+            .headers
+            .as_ref()
+            .map(|h| serde_json::to_string(h).unwrap_or_default());
+        let body_json = history
+            .body
+            .as_ref()
+            .map(|b| serde_json::to_string(b).unwrap_or_default());
+        let auth_json = history
+            .auth
+            .as_ref()
+            .map(|a| serde_json::to_string(a).unwrap_or_default());
 
         tx.execute(
             "INSERT INTO history (id, request_id, method, url, status, response_time, response_size, params, headers, body, auth, created_at)

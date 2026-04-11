@@ -5,34 +5,34 @@ use thiserror::Error;
 pub enum IApiError {
     #[error("数据库错误: {0}")]
     Database(#[from] rusqlite::Error),
-    
+
     #[error("HTTP请求错误: {0}")]
     Http(#[from] reqwest::Error),
-    
+
     #[error("IO错误: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("序列化错误: {0}")]
     Serialization(#[from] serde_json::Error),
-    
+
     #[error("脚本执行错误: {0}")]
     Script(String),
-    
+
     #[error("解析错误: {0}")]
     Parse(String),
-    
+
     #[error("验证错误: {0}")]
     Validation(String),
-    
+
     #[error("未找到资源: {0}")]
     NotFound(String),
-    
+
     #[error("请求已取消")]
     Cancelled,
-    
+
     #[error("超时错误")]
     Timeout,
-    
+
     #[error("未知错误: {0}")]
     Unknown(String),
 }
@@ -69,7 +69,7 @@ impl ErrorResponse {
             details: None,
         }
     }
-    
+
     pub fn with_details(mut self, details: impl Into<String>) -> Self {
         self.details = Some(details.into());
         self
@@ -91,9 +91,8 @@ impl From<&IApiError> for ErrorResponse {
             IApiError::Timeout => ("TIMEOUT", "请求超时"),
             IApiError::Unknown(_) => ("UNKNOWN_ERROR", "未知错误"),
         };
-        
-        ErrorResponse::new(code, message)
-            .with_details(error.to_string())
+
+        ErrorResponse::new(code, message).with_details(error.to_string())
     }
 }
 

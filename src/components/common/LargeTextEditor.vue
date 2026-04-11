@@ -18,6 +18,10 @@ const props = withDefaults(defineProps<Props>(), {
   maxLinesForVirtualScroll: 1000,
 })
 
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+}>()
+
 const contentRef = ref<HTMLElement | null>(null)
 const isVirtualScroll = ref(false)
 const scrollTop = ref(0)
@@ -73,6 +77,10 @@ function downloadContent() {
 defineExpose({
   copyContent,
   downloadContent,
+  setValue: (value: string) => {
+    emit('update:modelValue', value)
+  },
+  getValue: () => props.modelValue,
 })
 </script>
 
