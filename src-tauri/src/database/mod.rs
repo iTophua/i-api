@@ -160,6 +160,10 @@ impl Database {
                 status INTEGER NOT NULL,
                 response_time INTEGER NOT NULL,
                 response_size INTEGER NOT NULL,
+                params TEXT,
+                headers TEXT,
+                body TEXT,
+                auth TEXT,
                 created_at TEXT NOT NULL
             );
 
@@ -194,6 +198,17 @@ impl Database {
         }
         if let Err(e) = optimizer.create_indexes() {
             eprintln!("警告：创建数据库索引失败：{}", e);
+        }
+
+        // 数据库迁移：为 history 表添加新列（如果不存在）
+        let migrations = [
+            "ALTER TABLE history ADD COLUMN params TEXT",
+            "ALTER TABLE history ADD COLUMN headers TEXT",
+            "ALTER TABLE history ADD COLUMN body TEXT",
+            "ALTER TABLE history ADD COLUMN auth TEXT",
+        ];
+        for migration in migrations {
+            let _ = conn.execute(migration, []);
         }
 
         // 创建 Arc 包装

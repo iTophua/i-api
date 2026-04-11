@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useHistoryStore } from '@/stores'
 
 export function useUrlAutocomplete() {
@@ -32,9 +32,11 @@ export function useUrlAutocomplete() {
       .slice(0, 8)
   })
 
-  function updateInput(value: string) {
+  function updateInput(value: string, showDropdown = true) {
     currentInput.value = value
-    showSuggestions.value = value.length >= 2
+    if (showDropdown) {
+      showSuggestions.value = value.length >= 2
+    }
     selectedIndex.value = -1
   }
 
@@ -45,8 +47,18 @@ export function useUrlAutocomplete() {
     return suggestion
   }
 
-  function handleKeyDown(event: KeyboardEvent, callback: (url: string) => void) {
-    if (!showSuggestions.value || suggestions.value.length === 0) {
+  function handleKeyDown(event: KeyboardEvent, callback: (suggestion: { url: string; method: string }) => void) {
+    if (suggestions.value.length === 0) {
+      return false
+    }
+
+    if (!showSuggestions.value) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        showSuggestions.value = true
+        selectedIndex.value = event.key === 'ArrowDown' ? 0 : suggestions.value.length - 1
+        return true
+      }
       return false
     }
 
@@ -57,17 +69,14 @@ export function useUrlAutocomplete() {
         return true
       case 'ArrowUp':
         event.preventDefault()
-        selectedIndex.value = Math.max(selectedIndex.value - 1, -1)
-        if (selectedIndex.value === -1) {
-          return true
-        }
+        selectedIndex.value = Math.max(selectedIndex.value - 1, 0)
         return true
       case 'Enter':
         if (selectedIndex.value >= 0 && selectedIndex.value < suggestions.value.length) {
           event.preventDefault()
           const selected = suggestions.value[selectedIndex.value]
           selectSuggestion(selected)
-          callback(selected.url)
+          callback(selected)
           return true
         }
         return false
@@ -80,7 +89,7 @@ export function useUrlAutocomplete() {
           event.preventDefault()
           const selected = suggestions.value[selectedIndex.value]
           currentInput.value = selected.url
-          callback(selected.url)
+          callback(selected)
           showSuggestions.value = false
           return true
         }

@@ -138,6 +138,10 @@ export interface History {
   responseTime: number
   responseSize: number
   createdAt: string
+  params?: KeyValuePair[]
+  headers?: KeyValuePair[]
+  body?: RequestBody
+  auth?: AuthConfig
 }
 
 export interface Cookie {
@@ -205,7 +209,76 @@ export interface AppState {
   sidebarCollapsed: boolean
 }
 
-export function normalizeRequestBody(body: any): RequestBody {
+export interface RawRequestBody {
+  mode?: BodyMode
+  bodyMode?: BodyMode
+  body_mode?: BodyMode
+  raw?: string
+  rawType?: RawType
+  raw_type?: RawType
+  formData?: RawFormDatum[]
+  form_data?: RawFormDatum[]
+  urlencoded?: KeyValuePair[]
+  binary?: string
+}
+
+export interface RawFormDatum {
+  key?: string
+  value?: string
+  description?: string
+  enabled?: boolean
+  type?: 'text' | 'file'
+  formType?: 'text' | 'file'
+  form_type?: 'text' | 'file'
+  filePath?: string
+  file_path?: string
+}
+
+export interface RawAuthConfig {
+  type?: AuthType
+  authType?: AuthType
+  auth_type?: AuthType
+  basic?: {
+    username?: string
+    password?: string
+  }
+  bearer?: {
+    token?: string
+  }
+  apikey?: {
+    key?: string
+    value?: string
+    addTo?: 'header' | 'query'
+    add_to?: 'header' | 'query'
+  }
+}
+
+export interface RawRequest {
+  id?: string
+  name?: string
+  description?: string
+  method?: HttpMethod
+  url?: string
+  params?: KeyValuePair[]
+  headers?: KeyValuePair[]
+  body?: RawRequestBody
+  auth?: RawAuthConfig
+  preScript?: string
+  pre_script?: string
+  postScript?: string
+  post_script?: string
+  proxy?: ProxyConfig
+  followRedirects?: boolean
+  follow_redirects?: boolean
+  verifySsl?: boolean
+  verify_ssl?: boolean
+  createdAt?: string
+  created_at?: string
+  updatedAt?: string
+  updated_at?: string
+}
+
+export function normalizeRequestBody(body: RawRequestBody | null | undefined): RequestBody {
   if (!body) return { mode: 'none' }
 
   const normalized = {
@@ -220,10 +293,10 @@ export function normalizeRequestBody(body: any): RequestBody {
   return normalized
 }
 
-function normalizeFormData(formData: any): FormDatum[] | undefined {
+function normalizeFormData(formData: RawFormDatum[] | undefined): FormDatum[] | undefined {
   if (!formData || !Array.isArray(formData)) return undefined
 
-  return formData.map((item: any) => ({
+  return formData.map((item) => ({
     key: item.key || '',
     value: item.value || '',
     description: item.description,
@@ -233,7 +306,7 @@ function normalizeFormData(formData: any): FormDatum[] | undefined {
   }))
 }
 
-export function normalizeAuthConfig(auth: any): AuthConfig {
+export function normalizeAuthConfig(auth: RawAuthConfig | null | undefined): AuthConfig {
   if (!auth) return { type: 'none' }
 
   const authType = auth.type || auth.authType || auth.auth_type || 'none'
@@ -282,7 +355,7 @@ export function safeParseDate(dateStr: string | null | undefined, defaultDate?: 
   return date.toISOString()
 }
 
-export function normalizeRequest(request: any): Request {
+export function normalizeRequest(request: RawRequest): Request {
   return {
     id: request.id || crypto.randomUUID(),
     name: request.name || '未命名请求',
@@ -303,7 +376,53 @@ export function normalizeRequest(request: any): Request {
   }
 }
 
-export function toBackendRequest(request: Request): any {
+export interface BackendRequestBody {
+  body_mode: BodyMode
+  raw?: string
+  raw_type?: RawType
+  form_data?: {
+    key: string
+    value: string
+    description?: string
+    enabled: boolean
+    form_type: 'text' | 'file'
+    file_path?: string
+  }[]
+  urlencoded?: KeyValuePair[]
+  binary?: string
+}
+
+export interface BackendAuthConfig {
+  auth_type: AuthType
+  basic?: BasicAuth
+  bearer?: BearerAuth
+  apikey?: {
+    key: string
+    value: string
+    add_to: 'header' | 'query'
+  } | null
+}
+
+export interface BackendRequest {
+  id: string
+  name: string
+  description?: string
+  method: HttpMethod
+  url: string
+  params: KeyValuePair[]
+  headers: KeyValuePair[]
+  body: BackendRequestBody | null
+  auth: BackendAuthConfig | null
+  pre_script?: string
+  post_script?: string
+  proxy?: ProxyConfig
+  follow_redirects?: boolean
+  verify_ssl?: boolean
+  created_at: string
+  updated_at: string
+}
+
+export function toBackendRequest(request: Request): BackendRequest {
   return {
     id: request.id,
     name: request.name,

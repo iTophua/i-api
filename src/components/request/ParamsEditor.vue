@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NDataTable, NButton, NIcon, NInput, NCheckbox } from 'naive-ui'
+import { NDataTable, NButton, NIcon, NCheckbox } from 'naive-ui'
 import { AddOutline, TrashOutline } from '@vicons/ionicons5'
 import { h } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
@@ -98,7 +98,7 @@ const columns: DataTableColumns<KeyValuePair> = [
       :data="params"
       :bordered="false"
       size="small"
-      :row-key="(row: KeyValuePair, index: number) => row.id || index"
+      :row-key="(row: KeyValuePair) => row.id || ''"
     />
     <div class="add-row" @click="addRow">
       <NButton text type="primary" size="small">
@@ -133,6 +133,7 @@ const columns: DataTableColumns<KeyValuePair> = [
 
 .params-editor :deep(.n-data-table-td) {
   padding: 4px 8px;
+  vertical-align: middle;
 }
 
 .params-editor :deep(.n-data-table-th) {
@@ -141,6 +142,20 @@ const columns: DataTableColumns<KeyValuePair> = [
 
 .params-editor :deep(.n-input) {
   --n-height: 28px;
+}
+
+.params-editor :deep(.n-data-table-td:last-child) {
+  padding: 4px 8px;
+}
+
+.params-editor :deep(.n-data-table-td:last-child .n-button) {
+  padding: 0;
+  height: 28px;
+  line-height: 28px;
+}
+
+.params-editor :deep(.n-data-table-td:last-child .n-icon) {
+  font-size: 16px;
 }
 
 .add-row {

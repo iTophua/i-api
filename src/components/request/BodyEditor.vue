@@ -4,7 +4,6 @@ import {
   NRadioButton,
   NButton,
   NDataTable,
-  NInput,
   NCheckbox,
   NSelect,
   NIcon,
@@ -36,8 +35,12 @@ const binaryFileName = ref<string>('')
 const binaryFileSize = ref<number>(0)
 
 onMounted(async () => {
-  const mod = await import('@/components/common/MonacoEditor.vue')
-  MonacoEditor.value = mod.default
+  try {
+    const mod = await import('@/components/common/MonacoEditor.vue')
+    MonacoEditor.value = mod.default
+  } catch (e) {
+    console.error('加载 Monaco 编辑器失败:', e)
+  }
 })
 
 const bodyMode = computed({
@@ -329,7 +332,7 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
           :data="safeBody.formData || []"
           :bordered="false"
           size="small"
-          :row-key="(row: FormDatum, index: number) => row.id || index"
+          :row-key="(row: FormDatum) => row.id || ''"
         />
         <div class="table-toolbar">
           <NButton size="small" @click="addFormDataRow">
@@ -347,7 +350,7 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
           :data="safeBody.urlencoded || []"
           :bordered="false"
           size="small"
-          :row-key="(row: KeyValuePair, index: number) => row.id || index"
+          :row-key="(row: KeyValuePair) => row.id || ''"
         />
         <div class="table-toolbar">
           <NButton size="small" @click="addUrlencodedRow">
@@ -421,6 +424,33 @@ const urlencodedColumns: DataTableColumns<KeyValuePair> = [
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.content-section :deep(.n-data-table-td) {
+  padding: 4px 8px;
+  vertical-align: middle;
+}
+
+.content-section :deep(.n-data-table-th) {
+  padding: 6px 8px;
+}
+
+.content-section :deep(.n-input) {
+  --n-height: 28px;
+}
+
+.content-section :deep(.n-data-table-td:last-child) {
+  padding: 4px 8px;
+}
+
+.content-section :deep(.n-data-table-td:last-child .n-button) {
+  padding: 0;
+  height: 28px;
+  line-height: 28px;
+}
+
+.content-section :deep(.n-data-table-td:last-child .n-icon) {
+  font-size: 16px;
 }
 
 .empty-hint {

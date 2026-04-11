@@ -196,9 +196,29 @@ export const useRequestStore = defineStore('request', () => {
     openRequest(request, undefined, true)
   }
 
+  function duplicateTab(tabId: string) {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    if (!tab) return
+
+    const newRequest: Request = {
+      ...JSON.parse(JSON.stringify(tab.request)),
+      id: crypto.randomUUID(),
+      name: `${tab.request.name} (副本)`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    openRequest(newRequest, tab.collectionId, tab.isTemporary)
+  }
+
   function updateRequest(updates: Partial<Request>) {
     if (!currentTab.value) return
-    Object.assign(currentTab.value.request, updates, { updatedAt: new Date().toISOString() })
+    const updatedRequest = {
+      ...JSON.parse(JSON.stringify(currentTab.value.request)),
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    }
+    currentTab.value.request = updatedRequest
     currentTab.value.isDirty = true
   }
 
@@ -734,7 +754,7 @@ export const useRequestStore = defineStore('request', () => {
   }
 
   function moveRequest(
-    requestId: string,
+    _requestId: string,
     fromCollectionId: string,
     toCollectionId: string,
     fromIndex: number,
@@ -810,6 +830,7 @@ export const useRequestStore = defineStore('request', () => {
     moveTab,
     switchTab,
     newRequest,
+    duplicateTab,
     updateRequest,
     updateUrl,
     updateMethod,

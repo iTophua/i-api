@@ -260,6 +260,14 @@ pub struct History {
     pub response_time: u64,
     pub response_size: usize,
     pub created_at: String,
+    #[serde(default)]
+    pub params: Option<Vec<KeyValuePair>>,
+    #[serde(default)]
+    pub headers: Option<Vec<KeyValuePair>>,
+    #[serde(default)]
+    pub body: Option<RequestBody>,
+    #[serde(default)]
+    pub auth: Option<AuthConfig>,
 }
 
 impl History {
@@ -279,6 +287,37 @@ impl History {
             response_time,
             response_size,
             created_at: chrono::Utc::now().to_rfc3339(),
+            params: None,
+            headers: None,
+            body: None,
+            auth: None,
+        }
+    }
+
+    pub fn with_request_data(
+        method: String,
+        url: String,
+        status: u16,
+        response_time: u64,
+        response_size: usize,
+        params: Option<Vec<KeyValuePair>>,
+        headers: Option<Vec<KeyValuePair>>,
+        body: Option<RequestBody>,
+        auth: Option<AuthConfig>,
+    ) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            request_id: None,
+            method,
+            url,
+            status,
+            response_time,
+            response_size,
+            created_at: chrono::Utc::now().to_rfc3339(),
+            params,
+            headers,
+            body,
+            auth,
         }
     }
 }

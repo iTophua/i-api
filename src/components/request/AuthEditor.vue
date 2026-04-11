@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NSelect, NInput, NInputGroup, NInputGroupLabel, NButton, NIcon, NSpace } from 'naive-ui'
+import { NSelect, NInput, NInputGroup, NInputGroupLabel, NButton, NIcon, useMessage } from 'naive-ui'
 import { EyeOutline, EyeOffOutline, LockClosedOutline } from '@vicons/ionicons5'
 import { computed, ref, watch, onMounted } from 'vue'
 import type { AuthConfig, AuthType } from '@/types'
@@ -13,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:auth': [auth: AuthConfig]
 }>()
+
+const message = useMessage()
 
 const safeAuth = computed<AuthConfig>(() => props.auth ?? { type: 'none' })
 
@@ -137,12 +139,18 @@ const displayApiKeyValue = computed(() => {
 async function clearStoredCredentials() {
   if (!props.requestId) return
 
-  if (safeAuth.value.type === 'bearer') {
-    await deleteBearerToken(props.requestId)
-  } else if (safeAuth.value.type === 'basic') {
-    await deleteBasicAuth(props.requestId)
-  } else if (safeAuth.value.type === 'apikey' && apiKeyKey.value) {
-    await deleteApiKey(props.requestId, apiKeyKey.value)
+  try {
+    if (safeAuth.value.type === 'bearer') {
+      await deleteBearerToken(props.requestId)
+    } else if (safeAuth.value.type === 'basic') {
+      await deleteBasicAuth(props.requestId)
+    } else if (safeAuth.value.type === 'apikey' && apiKeyKey.value) {
+      await deleteApiKey(props.requestId, apiKeyKey.value)
+    }
+    message.success('凭证已清除')
+  } catch (error) {
+    console.error('清除凭证失败:', error)
+    message.error(`清除凭证失败: ${error}`)
   }
 }
 

@@ -23,9 +23,22 @@ impl DatabaseRepository {
         let conn = self.get_conn()?;
         let tx = conn.unchecked_transaction()?;
 
+        let params_json = history.params.as_ref().map(|p| {
+            serde_json::to_string(p).unwrap_or_default()
+        });
+        let headers_json = history.headers.as_ref().map(|h| {
+            serde_json::to_string(h).unwrap_or_default()
+        });
+        let body_json = history.body.as_ref().map(|b| {
+            serde_json::to_string(b).unwrap_or_default()
+        });
+        let auth_json = history.auth.as_ref().map(|a| {
+            serde_json::to_string(a).unwrap_or_default()
+        });
+
         tx.execute(
-            "INSERT INTO history (id, request_id, method, url, status, response_time, response_size, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO history (id, request_id, method, url, status, response_time, response_size, params, headers, body, auth, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             (
                 &history.id,
                 &history.request_id,
@@ -34,6 +47,10 @@ impl DatabaseRepository {
                 &history.status,
                 &history.response_time,
                 &history.response_size,
+                &params_json,
+                &headers_json,
+                &body_json,
+                &auth_json,
                 &history.created_at,
             ),
         )?;
@@ -51,11 +68,16 @@ impl DatabaseRepository {
     pub fn get_recent_history(&self, limit: i64) -> SqliteResult<Vec<History>> {
         let conn = self.get_conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, request_id, method, url, status, response_time, response_size, created_at
+            "SELECT id, request_id, method, url, status, response_time, response_size, params, headers, body, auth, created_at
              FROM history ORDER BY created_at DESC LIMIT ?",
         )?;
 
         let histories = stmt.query_map([limit], |row| {
+            let params_json: Option<String> = row.get(7)?;
+            let headers_json: Option<String> = row.get(8)?;
+            let body_json: Option<String> = row.get(9)?;
+            let auth_json: Option<String> = row.get(10)?;
+
             Ok(History {
                 id: row.get(0)?,
                 request_id: row.get(1)?,
@@ -64,7 +86,11 @@ impl DatabaseRepository {
                 status: row.get(4)?,
                 response_time: row.get(5)?,
                 response_size: row.get(6)?,
-                created_at: row.get(7)?,
+                params: params_json.and_then(|s| serde_json::from_str(&s).ok()),
+                headers: headers_json.and_then(|s| serde_json::from_str(&s).ok()),
+                body: body_json.and_then(|s| serde_json::from_str(&s).ok()),
+                auth: auth_json.and_then(|s| serde_json::from_str(&s).ok()),
+                created_at: row.get(11)?,
             })
         })?;
 
@@ -73,6 +99,18 @@ impl DatabaseRepository {
             result.push(history?);
         }
         Ok(result)
+    }
+
+    pub fn delete_history(&self, id: &str) -> SqliteResult<()> {
+        let conn = self.get_conn()?;
+        conn.execute("DELETE FROM history WHERE id = ?", [id])?;
+        Ok(())
+    }
+
+    pub fn clear_history(&self) -> SqliteResult<()> {
+        let conn = self.get_conn()?;
+        conn.execute("DELETE FROM history", [])?;
+        Ok(())
     }
 
     // ==================== Request 操作 ====================

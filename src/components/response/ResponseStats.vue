@@ -63,7 +63,7 @@ const sizeFormatted = computed(() => {
             :percentage="performanceScore"
             :color="performanceLevel.color"
             :show-indicator="false"
-            height="6px"
+            :height="6"
             style="width: 80px"
           />
         </div>

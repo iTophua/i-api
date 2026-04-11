@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useEnvironmentStore } from '@/stores'
 
 export function useVariableAutocomplete() {
@@ -7,7 +7,6 @@ export function useVariableAutocomplete() {
   const selectedIndex = ref(-1)
   const triggerPosition = ref(-1)
 
-  const currentInput = ref('')
   const currentValue = ref('')
 
   const suggestions = computed(() => {
@@ -24,11 +23,12 @@ export function useVariableAutocomplete() {
     const query = currentValue.value.slice(lastBracePos + 2).toLowerCase()
 
     const variables = environmentStore.variables
+    const entries = Object.entries(variables)
     if (!query) {
-      return variables.slice(0, 10)
+      return entries.slice(0, 10).map(([key, value]) => ({ key, value }))
     }
 
-    return Object.entries(variables)
+    return entries
       .filter(([key]) => key.toLowerCase().includes(query))
       .slice(0, 10)
       .map(([key, value]) => ({ key, value }))

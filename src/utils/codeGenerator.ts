@@ -67,7 +67,7 @@ export function generateCode(
 
 function replaceEnvVariables(text: string): string {
   const variablePattern = /\{\{([^}]+)\}\}/g
-  return text.replace(variablePattern, (match, varName) => {
+  return text.replace(variablePattern, (_match, varName) => {
     return `<${varName}>`
   })
 }
@@ -164,7 +164,7 @@ function generateFetch(request: Request): string {
 
   const enabledHeaders = request.headers.filter((h) => h.enabled)
   if (enabledHeaders.length > 0) {
-    const headersStr = enabledHeaders.map((h) => `'${header.key}': '${header.value}'`).join(',\n      ')
+    const headersStr = enabledHeaders.map((h) => `'${h.key}': '${h.value}'`).join(',\n      ')
     options.push(`headers: {\n      ${headersStr}\n    }`)
   }
 

@@ -1,14 +1,17 @@
 import { ref, onUnmounted } from 'vue'
-import { getCurrentWindow, listen } from '@tauri-apps/api/event'
+import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { Response } from '@/types'
 
 interface StreamOptions {
   requestId: string
   url: string
   method: string
-  headers: Array<{ key: string; value: string; enabled: boolean }>
+  params?: Array<{ key: string; value: string; enabled: boolean }>
+  headers?: Array<{ key: string; value: string; enabled: boolean }>
   body?: any
+  auth?: any
   timeout?: number
   returnBytes?: boolean
 }

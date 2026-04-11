@@ -24,7 +24,8 @@ import BodyEditor from './BodyEditor.vue'
 import AuthEditor from './AuthEditor.vue'
 import ScriptEditor from './ScriptEditor.vue'
 import SaveRequestModal from '@/components/common/SaveRequestModal.vue'
-import type { Response } from '@/types'
+import type { SelectOption } from 'naive-ui'
+import type { Response, HttpMethod, Request } from '@/types'
 import { HTTP_METHOD_COLORS } from '@/types'
 
 const message = useMessage()
@@ -45,7 +46,6 @@ const {
 const currentTab = ref('params')
 const showSaveModal = ref(false)
 const saveMode = ref<'save' | 'save-as'>('save')
-const urlInputRef = ref<any>(null)
 
 const methodOptions = [
   { label: 'GET', value: 'GET' },
@@ -61,7 +61,7 @@ const methodOptions = [
 const methodColors = HTTP_METHOD_COLORS
 
 function renderMethodLabel(option: { label: string; value: string }) {
-  const colors = methodColors[option.value] || methodColors.GET
+  const colors = methodColors[option.value as HttpMethod] || methodColors.GET
   return h(
     'span',
     {
@@ -79,8 +79,10 @@ function renderMethodLabel(option: { label: string; value: string }) {
   )
 }
 
-function renderMethodTag(props: { option: { label: string; value: string }; handleClose: () => void }) {
-  const colors = methodColors[props.option.value] || methodColors.GET
+function renderMethodTag(props: { option: SelectOption; handleClose: () => void }) {
+  const value = typeof props.option.value === 'string' ? props.option.value : 'GET'
+  const colors = methodColors[value as HttpMethod] || methodColors.GET
+  const label = typeof props.option.label === 'string' ? props.option.label : value
   return h(
     'span',
     {
@@ -94,7 +96,7 @@ function renderMethodTag(props: { option: { label: string; value: string }; hand
         letterSpacing: '0.5px',
       }
     },
-    props.option.label
+    label
   )
 }
 
@@ -177,6 +179,10 @@ async function sendRequest(download = false) {
       status: response.status,
       responseTime: response.responseTime,
       responseSize: response.responseSize,
+      params: requestStore.currentRequest.params,
+      headers: requestStore.currentRequest.headers,
+      body: requestStore.currentRequest.body,
+      auth: requestStore.currentRequest.auth,
     })
 
     if (download) {
@@ -238,10 +244,12 @@ async function downloadResponse(response: Response) {
     }
   }
 
-  let fileData: Uint8Array
+  let fileData: Uint8Array<ArrayBuffer>
   if (response.bodyBytes) {
     // 二进制响应：使用原始字节
-    fileData = new Uint8Array(response.bodyBytes)
+    const buffer = new ArrayBuffer(response.bodyBytes.length)
+    fileData = new Uint8Array(buffer)
+    fileData.set(response.bodyBytes)
   } else {
     // 文本响应：直接编码
     const encoder = new TextEncoder()
@@ -390,8 +398,9 @@ function handleUrlInput(value: string) {
 }
 
 function handleUrlKeyDown(event: KeyboardEvent) {
-  const handled = handleAutocompleteKeyDown(event, (url: string) => {
-    requestStore.updateUrl(url)
+  const handled = handleAutocompleteKeyDown(event, (suggestion: { url: string; method: string }) => {
+    requestStore.updateUrl(suggestion.url)
+    requestStore.updateMethod(suggestion.method as Request['method'])
   })
   if (!handled && event.key === 'Enter') {
     event.preventDefault()
@@ -399,18 +408,25 @@ function handleUrlKeyDown(event: KeyboardEvent) {
   }
 }
 
-function selectSuggestion(url: string) {
-  requestStore.updateUrl(url)
+function selectSuggestion(suggestion: { url: string; method: string }) {
+  requestStore.updateUrl(suggestion.url)
+  requestStore.updateMethod(suggestion.method as Request['method'])
   hideSuggestions()
+}
+
+function handleUrlFocus() {
+  if (requestStore.currentRequest.url.length >= 2 && suggestions.value.length > 0) {
+    showSuggestions.value = true
+  }
+}
+
+function handleUrlBlur() {
+  setTimeout(hideSuggestions, 200)
 }
 
 onMounted(() => {
   window.addEventListener('send-request', handleSendRequest)
-  updateInput(requestStore.currentRequest.url)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('send-request', handleSendRequest)
+  updateInput(requestStore.currentRequest.url, false)
 })
 
 onUnmounted(() => {
@@ -433,7 +449,6 @@ onUnmounted(() => {
       />
       <div class="url-input-container">
         <NInput
-          ref="urlInputRef"
           :value="requestStore.currentRequest.url"
           :placeholder="t('request.enterUrl')"
           autocomplete="off"
@@ -442,8 +457,8 @@ onUnmounted(() => {
           aria-label="请求 URL 输入"
           @update:value="handleUrlInput"
           @keydown="handleUrlKeyDown"
-          @focus="showSuggestions && suggestions.length > 0 && (showSuggestions = true)"
-          @blur="setTimeout(hideSuggestions, 200)"
+          @focus="handleUrlFocus"
+          @blur="handleUrlBlur"
         />
         <div v-if="showSuggestions && suggestions.length > 0" class="url-suggestions">
           <div
@@ -451,7 +466,7 @@ onUnmounted(() => {
             :key="suggestion.url"
             class="suggestion-item"
             :class="{ selected: index === selectedIndex }"
-            @mousedown.prevent="selectSuggestion(suggestion.url)"
+            @mousedown.prevent="selectSuggestion(suggestion)"
           >
             <span class="suggestion-method" :style="{ color: HTTP_METHOD_COLORS[suggestion.method as keyof typeof HTTP_METHOD_COLORS]?.color }">
               {{ suggestion.method }}
@@ -493,29 +508,29 @@ onUnmounted(() => {
       <!-- 进度指示 -->
       <div v-if="requestStore.isLoading" class="progress-container">
         <div
-          v-if="requestStore.uploadProgress.value > 0 && requestStore.uploadProgress.value < 100"
+          v-if="requestStore.uploadProgress > 0 && requestStore.uploadProgress < 100"
           class="progress-item"
         >
           <span class="progress-label">上传</span>
           <NProgress
-            :percentage="requestStore.uploadProgress.value"
+            :percentage="requestStore.uploadProgress"
             :show-indicator="false"
-            height="6px"
+            :height="6"
             status="success"
             class="progress-bar"
           />
         </div>
         <div
           v-if="
-            requestStore.downloadProgress.value > 0 && requestStore.downloadProgress.value < 100
+            requestStore.downloadProgress > 0 && requestStore.downloadProgress < 100
           "
           class="progress-item"
         >
           <span class="progress-label">下载</span>
           <NProgress
-            :percentage="requestStore.downloadProgress.value"
+            :percentage="requestStore.downloadProgress"
             :show-indicator="false"
-            height="6px"
+            :height="6"
             status="success"
             class="progress-bar"
           />
@@ -591,8 +606,9 @@ onUnmounted(() => {
 
         <NTabPane name="preScript" display-directive="show">
           <template #tab>{{ t('request.preRequestScript') }}</template>
-          <div class="tab-scroll-content">
+          <div class="tab-editor-content">
             <ScriptEditor
+              type="preRequest"
               :script="requestStore.currentRequest.preScript"
               @update:script="(s: string) => requestStore.updateRequest({ preScript: s })"
             />
@@ -601,8 +617,9 @@ onUnmounted(() => {
 
         <NTabPane name="tests" display-directive="show">
           <template #tab>{{ t('request.testScript') }}</template>
-          <div class="tab-scroll-content">
+          <div class="tab-editor-content">
             <ScriptEditor
+              type="test"
               :script="requestStore.currentRequest.postScript"
               @update:script="(s: string) => requestStore.updateRequest({ postScript: s })"
             />
@@ -755,7 +772,7 @@ onUnmounted(() => {
   top: 100%;
   left: 0;
   right: 0;
-  background: var(--n-color);
+  background: #fff;
   border: 1px solid var(--n-border-color);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -774,9 +791,12 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.suggestion-item:hover,
+.suggestion-item:hover {
+  background: rgba(24, 160, 88, 0.1);
+}
+
 .suggestion-item.selected {
-  background: var(--n-color-hover);
+  background: rgba(24, 160, 88, 0.15);
 }
 
 .suggestion-method {
@@ -881,6 +901,18 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
+.tab-editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
 .tab-with-badge {
   display: inline-flex;
   align-items: center;
@@ -949,5 +981,17 @@ onUnmounted(() => {
     padding: 8px 12px;
     font-size: 14px;
   }
+}
+
+:global([data-theme='dark']) .url-suggestions {
+  background: #2d2d2d;
+}
+
+:global([data-theme='dark']) .suggestion-item:hover {
+  background: rgba(99, 226, 183, 0.15);
+}
+
+:global([data-theme='dark']) .suggestion-item.selected {
+  background: rgba(99, 226, 183, 0.2);
 }
 </style>

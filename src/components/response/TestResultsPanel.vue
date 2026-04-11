@@ -27,12 +27,18 @@ const testResults = computed<TestSuite | null>(() => {
   const currentTab = requestStore.currentTab
   if (!currentTab?.testResults) return null
 
-  const results = currentTab.testResults as TestResult[]
-  const passed = results.filter((r) => r.status === 'pass').length
-  const failed = results.filter((r) => r.status === 'fail').length
+  const rawResults = currentTab.testResults
+  const results: TestResult[] = rawResults.assertions.map((a, i) => ({
+    id: `test-${i}`,
+    name: a.name,
+    status: a.passed ? 'pass' : 'fail' as const,
+    message: a.message,
+  }))
+  const passed = rawResults.passed
+  const failed = rawResults.failed
   const errors = results.filter((r) => r.status === 'error').length
-  const total = results.length
-  const duration = results.reduce((sum, r) => sum + (r.duration || 0), 0)
+  const total = rawResults.total
+  const duration = 0
 
   return {
     name: 'API Tests',
@@ -116,7 +122,7 @@ const statusIcon = (status: string) => {
           :percentage="passRate"
           :color="passRate === 100 ? '#18A058' : passRate > 50 ? '#F0A020' : '#D03050'"
           :show-indicator="false"
-          height="8px"
+          :height="8"
         />
       </div>
 

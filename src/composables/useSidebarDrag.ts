@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import type { HttpMethod } from '@/types'
 
 const DRAG_THRESHOLD = 5
 
@@ -8,6 +9,7 @@ interface SidebarDragState {
   dragId: string | null
   dragName: string | null
   dragExpanded: boolean
+  dragMethod?: HttpMethod
   sourceIndex: number
   currentIndex: number
   elementHeight: number
@@ -19,7 +21,7 @@ interface SidebarDragState {
 }
 
 export function useSidebarDrag(
-  getCollections: () => { id: string; name: string; requests: { id: string; name: string }[] }[],
+  _getCollections: () => { id: string; name: string; requests: { id: string; name: string }[] }[],
   reorderCollection: (from: number, to: number) => void,
   reorderRequest: (collectionId: string, from: number, to: number) => void
 ) {
@@ -111,6 +113,7 @@ export function useSidebarDrag(
       dragId: null,
       dragName: null,
       dragExpanded: false,
+      dragMethod: undefined,
       sourceIndex: 0,
       currentIndex: 0,
       elementHeight: 0,
@@ -123,7 +126,7 @@ export function useSidebarDrag(
 
   function handleRequestDragStart(
     e: MouseEvent,
-    request: { id: string; name: string },
+    request: { id: string; name: string; method?: HttpMethod },
     collectionId: string,
     requestIndex: number
   ) {
@@ -141,6 +144,7 @@ export function useSidebarDrag(
       dragId: request.id,
       dragName: request.name,
       dragExpanded: false,
+      dragMethod: request.method,
       sourceIndex: requestIndex,
       currentIndex: requestIndex,
       elementHeight: rect.height,
@@ -202,6 +206,7 @@ export function useSidebarDrag(
       dragId: null,
       dragName: null,
       dragExpanded: false,
+      dragMethod: undefined,
       sourceIndex: 0,
       currentIndex: 0,
       elementHeight: 0,
@@ -264,7 +269,7 @@ export function useSidebarDrag(
   function getDraggingStyle(): Record<string, string> | undefined {
     if (!dragState.value.dragging || !dragState.value.dragStarted || !dragState.value.sourceRect) return undefined
 
-    const { mouseX, mouseY, elementHeight, sourceRect } = dragState.value
+    const { mouseY, elementHeight, sourceRect } = dragState.value
     if (!sourceRect) return undefined
 
     const style: Record<string, string> = {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NInput, NModal, NDataTable, NIcon, NCheckbox, NPopconfirm } from 'naive-ui'
+import { NButton, NInput, NModal, NDataTable, NIcon, NCheckbox, NPopconfirm, useMessage } from 'naive-ui'
 import { ref, computed, onMounted, h } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
 import { useEnvironmentStore } from '@/stores'
@@ -8,6 +8,7 @@ import { TrashOutline, AddOutline } from '@vicons/ionicons5'
 import type { Environment, Variable } from '@/types'
 
 const environmentStore = useEnvironmentStore()
+const message = useMessage()
 
 const searchQuery = ref('')
 const editingEnvName = ref('')
@@ -47,8 +48,10 @@ async function confirmCreateEnv() {
     environmentStore.setManagerEnvironment(newEnv.id)
     showCreateModal.value = false
     newEnvName.value = ''
+    message.success('环境创建成功')
   } catch (error) {
     console.error('环境创建失败:', error)
+    message.error(`创建环境失败: ${error}`)
   }
 }
 
@@ -58,16 +61,28 @@ function cancelCreateEnv() {
 }
 
 async function handleDeleteEnv(envId: string) {
-  await environmentStore.deleteEnvironment(envId)
+  try {
+    await environmentStore.deleteEnvironment(envId)
+    message.success('环境删除成功')
+  } catch (error) {
+    console.error('删除环境失败:', error)
+    message.error(`删除环境失败: ${error}`)
+  }
 }
 
 async function handleDuplicateEnv() {
   if (!environmentStore.managerEnvironment) return
-  const newEnv = await environmentStore.duplicateEnvironment(
-    environmentStore.managerEnvironment.id
-  )
-  if (newEnv) {
-    environmentStore.setManagerEnvironment(newEnv.id)
+  try {
+    const newEnv = await environmentStore.duplicateEnvironment(
+      environmentStore.managerEnvironment.id
+    )
+    if (newEnv) {
+      environmentStore.setManagerEnvironment(newEnv.id)
+      message.success('环境复制成功')
+    }
+  } catch (error) {
+    console.error('复制环境失败:', error)
+    message.error(`复制环境失败: ${error}`)
   }
 }
 
@@ -85,7 +100,13 @@ async function saveEnvName() {
 
   const newName = editingEnvName.value.trim()
   if (newName !== environmentStore.managerEnvironment.name) {
-    await environmentStore.renameEnvironment(environmentStore.managerEnvironment.id, newName)
+    try {
+      await environmentStore.renameEnvironment(environmentStore.managerEnvironment.id, newName)
+      message.success('环境重命名成功')
+    } catch (error) {
+      console.error('重命名环境失败:', error)
+      message.error(`重命名环境失败: ${error}`)
+    }
   }
   isEditingName.value = false
 }
@@ -115,7 +136,12 @@ function addRow() {
 
 async function deleteRow(index: number) {
   if (!environmentStore.managerEnvironment) return
-  await environmentStore.deleteVariable(environmentStore.managerEnvironment.id, index)
+  try {
+    await environmentStore.deleteVariable(environmentStore.managerEnvironment.id, index)
+  } catch (error) {
+    console.error('删除变量失败:', error)
+    message.error(`删除变量失败: ${error}`)
+  }
 }
 
 const columns: DataTableColumns<Variable> = [

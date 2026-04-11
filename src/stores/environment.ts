@@ -17,17 +17,19 @@ export const useEnvironmentStore = defineStore('environment', () => {
   const managerEnvironmentId = ref<string>('default')
   const isLoaded = ref(false)
 
-  const currentEnvironment = computed(
-    () =>
-      environments.value.find((e: Environment) => e.id === currentEnvironmentId.value) ||
-      environments.value[0]
-  )
+  const currentEnvironment = computed(() => {
+    const env = environments.value.find((e: Environment) => e.id === currentEnvironmentId.value)
+    if (env) return env
+    if (environments.value.length > 0) return environments.value[0]
+    return null
+  })
 
-  const managerEnvironment = computed(
-    () =>
-      environments.value.find((e: Environment) => e.id === managerEnvironmentId.value) ||
-      environments.value[0]
-  )
+  const managerEnvironment = computed(() => {
+    const env = environments.value.find((e: Environment) => e.id === managerEnvironmentId.value)
+    if (env) return env
+    if (environments.value.length > 0) return environments.value[0]
+    return null
+  })
 
   const variables = computed(() => {
     const vars: Record<string, string> = {}

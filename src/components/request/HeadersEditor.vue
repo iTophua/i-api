@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { NDataTable, NButton, NIcon, NInput, NCheckbox, NDropdown, NPopover } from 'naive-ui'
+import { NDataTable, NButton, NIcon, NInput, NCheckbox, NPopover } from 'naive-ui'
 import { AddOutline, TrashOutline, ChevronDownOutline } from '@vicons/ionicons5'
 import { ref, computed, h } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
 import type { KeyValuePair } from '@/types'
-import { COMMON_HEADERS, getHeaderSuggestions, type CommonHeader } from '@/utils/commonHeaders'
+import { getHeaderSuggestions, type CommonHeader } from '@/utils/commonHeaders'
 import VariableInput from '@/components/common/VariableInput.vue'
 
 const props = defineProps<{
@@ -106,30 +106,6 @@ const columns: DataTableColumns<KeyValuePair> = [
       ),
   },
 ]
-
-function renderDropdownHeader() {
-  return h('div', { class: 'header-dropdown-header' }, [
-    h('input', {
-      class: 'header-search-input',
-      placeholder: '搜索常用请求头...',
-      value: searchQuery.value,
-      onInput: (e: Event) => {
-        searchQuery.value = (e.target as HTMLInputElement).value
-      }
-    })
-  ])
-}
-
-function renderDropdownOption(header: CommonHeader) {
-  return h('div', {
-    class: 'header-option',
-    onClick: () => addHeader(header)
-  }, [
-    h('div', { class: 'header-option-key' }, header.key),
-    h('div', { class: 'header-option-value' }, header.value || '(无默认值)'),
-    h('div', { class: 'header-option-desc' }, header.description)
-  ])
-}
 </script>
 
 <template>
@@ -139,7 +115,7 @@ function renderDropdownOption(header: CommonHeader) {
       :data="headers"
       :bordered="false"
       size="small"
-      :row-key="(row: KeyValuePair, index: number) => row.id || index"
+      :row-key="(row: KeyValuePair) => row.id || ''"
     />
     <div class="editor-toolbar">
       <NPopover
@@ -212,6 +188,7 @@ function renderDropdownOption(header: CommonHeader) {
 
 .headers-editor :deep(.n-data-table-td) {
   padding: 4px 8px;
+  vertical-align: middle;
 }
 
 .headers-editor :deep(.n-data-table-th) {
@@ -220,6 +197,20 @@ function renderDropdownOption(header: CommonHeader) {
 
 .headers-editor :deep(.n-input) {
   --n-height: 28px;
+}
+
+.headers-editor :deep(.n-data-table-td:last-child) {
+  padding: 4px 8px;
+}
+
+.headers-editor :deep(.n-data-table-td:last-child .n-button) {
+  padding: 0;
+  height: 28px;
+  line-height: 28px;
+}
+
+.headers-editor :deep(.n-data-table-td:last-child .n-icon) {
+  font-size: 16px;
 }
 
 .editor-toolbar {

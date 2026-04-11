@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NList, NListItem, NButton, NTag, NFlex, NEmpty, NTooltip } from 'naive-ui'
+import { NList, NListItem, NButton, NTag, NEmpty, NTooltip } from 'naive-ui'
 import { computed } from 'vue'
 import { useHistoryStore } from '@/stores'
 import { AppIcon } from '@/components/icons'
@@ -97,7 +97,7 @@ function formatSize(bytes: number): string {
         v-for="history in displayHistories"
         :key="history.id"
         class="history-item"
-        @click="handleSelect(history)"
+        @dblclick="handleSelect(history)"
       >
         <div class="item-content">
           <div class="item-left">
@@ -121,19 +121,17 @@ function formatSize(bytes: number): string {
               </div>
             </div>
           </div>
-          
-          <div class="item-right">
-            <NFlex :size="4">
-              <NTooltip placement="top">
-                <template #trigger>
-                  <NButton text size="small" @click.stop="handleDelete(history.id, $event)">
-                    <AppIcon type="trash" :size="14" />
-                  </NButton>
-                </template>
-                删除记录
-              </NTooltip>
-            </NFlex>
-          </div>
+        </div>
+        
+        <div class="item-actions">
+          <NTooltip placement="top">
+            <template #trigger>
+              <NButton text size="small" @click.stop="handleDelete(history.id, $event)">
+                <AppIcon type="trash" :size="14" />
+              </NButton>
+            </template>
+            删除记录
+          </NTooltip>
         </div>
       </NListItem>
     </NList>
@@ -169,9 +167,14 @@ function formatSize(bytes: number): string {
   padding-bottom: 4px;
 }
 
+.history-list-component :deep(.n-list-item__main) {
+  overflow: hidden;
+}
+
 .history-item {
   transition: all 0.2s ease;
   border-bottom: 1px solid var(--n-border-color);
+  position: relative;
 }
 
 .history-item :deep(.n-tag) {
@@ -187,6 +190,8 @@ function formatSize(bytes: number): string {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  width: 100%;
 }
 
 .item-left {
@@ -194,11 +199,13 @@ function formatSize(bytes: number): string {
   align-items: center;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .item-main {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .item-url {
@@ -209,6 +216,15 @@ function formatSize(bytes: number): string {
   white-space: nowrap;
   margin-bottom: 2px;
   font-weight: 500;
+  display: block;
+  max-width: 100%;
+  padding-right: 0;
+  box-sizing: border-box;
+  transition: padding-right 0.2s ease;
+}
+
+.history-item:hover .item-url {
+  padding-right: 30px;
 }
 
 .item-meta {
@@ -217,6 +233,7 @@ function formatSize(bytes: number): string {
   gap: 6px;
   font-size: var(--font-size-compact-xs);
   margin-top: 1px;
+  flex-wrap: wrap;
 }
 
 .method-tag {
@@ -233,14 +250,29 @@ function formatSize(bytes: number): string {
   font-weight: 500;
 }
 
-.item-right {
+.item-actions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.2s ease;
-  flex-shrink: 0;
+  pointer-events: none;
 }
 
-.history-item:hover .item-right {
+.history-item:hover .item-actions {
   opacity: 1;
+  pointer-events: auto;
+}
+
+.item-actions :deep(.n-button) {
+  color: #d03050;
+}
+
+.item-actions :deep(.n-button:hover) {
+  color: #de3e5e;
 }
 
 .empty-state {

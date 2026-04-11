@@ -42,6 +42,8 @@ pub fn run() {
             get_all_requests,
             delete_request,
             get_recent_history,
+            delete_history,
+            clear_history,
             execute_script,
             parse_curl_command,
             export_postman_collection,
@@ -83,12 +85,16 @@ async fn send_http_request(
 ) -> Result<HttpResponse, String> {
     let response = http::send_request(request.clone()).await?;
 
-    let history = History::new(
+    let history = History::with_request_data(
         request.method,
         request.url,
         response.status,
         response.response_time,
         response.response_size as usize,
+        Some(request.params),
+        Some(request.headers),
+        request.body,
+        request.auth,
     );
     let limit = history_limit.unwrap_or(100);
     let _ = db.repository.add_history(&history, limit);
@@ -149,12 +155,16 @@ async fn send_http_request_stream(
             );
             
             // 保存历史
-            let history = History::new(
+            let history = History::with_request_data(
                 request_clone.method,
                 request_clone.url,
                 status,
                 response_time,
                 response_size,
+                Some(request_clone.params),
+                Some(request_clone.headers),
+                request_clone.body,
+                request_clone.auth,
             );
             let limit = history_limit.unwrap_or(100);
             let _ = db.repository.add_history(&history, limit);
@@ -196,6 +206,16 @@ fn delete_request(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(),
 #[tauri::command]
 fn get_recent_history(limit: usize, db: tauri::State<'_, Arc<Database>>) -> Result<Vec<History>, String> {
     db.repository.get_recent_history(limit as i64).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_history(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
+    db.repository.delete_history(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn clear_history(db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
+    db.repository.clear_history().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

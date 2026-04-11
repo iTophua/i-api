@@ -46,12 +46,12 @@ function handleSelectHistory(history: History) {
   emit('select', history)
 }
 
-function handleDeleteHistory(id: string) {
-  historyStore.deleteHistory(id)
+async function handleDeleteHistory(id: string) {
+  await historyStore.deleteHistory(id)
 }
 
-function handleClearAll() {
-  historyStore.clearHistory()
+async function handleClearAll() {
+  await historyStore.clearHistory()
   searchInput.value = ''
 }
 </script>

@@ -5,11 +5,12 @@ import {
   normalizeAuthConfig,
   toBackendRequest,
 } from '@/types'
+import type { RawRequest, Request, RawRequestBody, RawAuthConfig } from '@/types'
 
 describe('Type Normalization Functions', () => {
   describe('normalizeRequest', () => {
     it('should handle request with basic fields', () => {
-      const input = {
+      const input: RawRequest = {
         id: 'test-id',
         name: 'Test Request',
         method: 'POST',
@@ -24,7 +25,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should generate UUID if not provided', () => {
-      const input = {
+      const input: RawRequest = {
         name: 'Test',
         method: 'GET',
         url: 'https://api.example.com',
@@ -37,7 +38,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should handle pre_script and post_script fields', () => {
-      const input = {
+      const input: RawRequest = {
         name: 'Test',
         method: 'POST',
         url: 'https://api.example.com',
@@ -52,7 +53,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should normalize body correctly', () => {
-      const input = {
+      const input: RawRequest = {
         name: 'Test',
         method: 'POST',
         url: 'https://api.example.com',
@@ -66,7 +67,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should normalize auth correctly', () => {
-      const input = {
+      const input: RawRequest = {
         name: 'Test',
         method: 'POST',
         url: 'https://api.example.com',
@@ -82,7 +83,7 @@ describe('Type Normalization Functions', () => {
 
   describe('normalizeRequestBody', () => {
     it('should normalize body with camelCase mode', () => {
-      const input = { bodyMode: 'raw', raw: 'test', rawType: 'json' }
+      const input: RawRequestBody = { bodyMode: 'raw', raw: 'test', rawType: 'json' }
 
       const result = normalizeRequestBody(input)
 
@@ -91,7 +92,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should normalize body with snake_case mode', () => {
-      const input = { body_mode: 'urlencoded', urlencoded: [] }
+      const input: RawRequestBody = { body_mode: 'urlencoded', urlencoded: [] }
 
       const result = normalizeRequestBody(input)
 
@@ -105,7 +106,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should normalize form data type fields', () => {
-      const input = {
+      const input: RawRequestBody = {
         formData: [
           { key: 'file', value: '', enabled: true, type: 'file', filePath: '/path/to/file' },
         ],
@@ -121,7 +122,7 @@ describe('Type Normalization Functions', () => {
 
   describe('normalizeAuthConfig', () => {
     it('should normalize basic auth', () => {
-      const input = { type: 'basic', basic: { username: 'user', password: 'pass' } }
+      const input: RawAuthConfig = { type: 'basic', basic: { username: 'user', password: 'pass' } }
 
       const result = normalizeAuthConfig(input)
 
@@ -131,7 +132,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should normalize bearer auth', () => {
-      const input = { type: 'bearer', bearer: { token: 'my-token' } }
+      const input: RawAuthConfig = { type: 'bearer', bearer: { token: 'my-token' } }
 
       const result = normalizeAuthConfig(input)
 
@@ -140,7 +141,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should normalize apikey auth', () => {
-      const input = { type: 'apikey', apikey: { key: 'X-API-Key', value: 'secret', add_to: 'header' } }
+      const input: RawAuthConfig = { type: 'apikey', apikey: { key: 'X-API-Key', value: 'secret', add_to: 'header' } }
 
       const result = normalizeAuthConfig(input)
 
@@ -150,7 +151,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should default to none auth', () => {
-      const input = {}
+      const input: RawAuthConfig = {}
 
       const result = normalizeAuthConfig(input)
 
@@ -158,7 +159,7 @@ describe('Type Normalization Functions', () => {
     })
 
     it('should handle snake_case auth_type', () => {
-      const input = { auth_type: 'bearer', bearer: { token: 'token' } }
+      const input: RawAuthConfig = { auth_type: 'bearer', bearer: { token: 'token' } }
 
       const result = normalizeAuthConfig(input)
 
@@ -168,15 +169,15 @@ describe('Type Normalization Functions', () => {
 
   describe('toBackendRequest', () => {
     it('should convert request to backend format', () => {
-      const input = {
+      const input: Request = {
         id: 'test-id',
         name: 'Test',
-        method: 'POST' as const,
+        method: 'POST',
         url: 'https://api.example.com',
         params: [],
         headers: [],
-        body: { mode: 'raw' as const, raw: '{"test":true}', rawType: 'json' as const },
-        auth: { type: 'bearer' as const, bearer: { token: 'token' } },
+        body: { mode: 'raw', raw: '{"test":true}', rawType: 'json' },
+        auth: { type: 'bearer', bearer: { token: 'token' } },
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
       }
@@ -185,19 +186,19 @@ describe('Type Normalization Functions', () => {
 
       expect(result.id).toBe('test-id')
       expect(result.created_at).toBe('2024-01-01T00:00:00Z')
-      expect(result.body.body_mode).toBe('raw')
+      expect(result.body?.body_mode).toBe('raw')
     })
 
     it('should handle apikey add_to conversion', () => {
-      const input = {
+      const input: Request = {
         id: 'test-id',
         name: 'Test',
-        method: 'GET' as const,
+        method: 'GET',
         url: 'https://api.example.com',
         params: [],
         headers: [],
-        body: { mode: 'none' as const },
-        auth: { type: 'apikey' as const, apikey: { key: 'key', value: 'val', addTo: 'query' as const } },
+        body: { mode: 'none' },
+        auth: { type: 'apikey', apikey: { key: 'key', value: 'val', addTo: 'query' } },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }

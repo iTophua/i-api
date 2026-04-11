@@ -107,16 +107,26 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
-  function clearHistory() {
-    histories.value = []
-    searchQuery.value = ''
-    filterMethod.value = 'all'
-    filterStatus.value = 'all'
-    dateRange.value = { start: null, end: null }
+  async function clearHistory() {
+    try {
+      await invoke('clear_history')
+      histories.value = []
+      searchQuery.value = ''
+      filterMethod.value = 'all'
+      filterStatus.value = 'all'
+      dateRange.value = { start: null, end: null }
+    } catch (error) {
+      console.error('清空历史记录失败:', error)
+    }
   }
 
-  function deleteHistory(id: string) {
-    histories.value = histories.value.filter((h: History) => h.id !== id)
+  async function deleteHistory(id: string) {
+    try {
+      await invoke('delete_history', { id })
+      histories.value = histories.value.filter((h: History) => h.id !== id)
+    } catch (error) {
+      console.error('删除历史记录失败:', error)
+    }
   }
 
   function clearFiltered() {

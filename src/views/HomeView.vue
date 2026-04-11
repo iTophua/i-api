@@ -41,6 +41,8 @@ const showSettings = ref(false)
 const showEnvironmentManager = ref(false)
 
 const contextMenuOptions = [
+  { label: '复制', key: 'duplicate' },
+  { type: 'divider', key: 'd1' },
   { label: '关闭', key: 'close' },
   { label: '关闭左边', key: 'close-left' },
   { label: '关闭右边', key: 'close-right' },
@@ -155,6 +157,9 @@ function handleContextMenuSelect(key: string) {
   if (!contextMenuTabId.value) return
 
   switch (key) {
+    case 'duplicate':
+      requestStore.duplicateTab(contextMenuTabId.value)
+      break
     case 'close':
       requestStore.closeTab(contextMenuTabId.value)
       break
@@ -253,7 +258,6 @@ useShortcuts([
           @code="handleCodeSelect"
         />
       </div>
-      <div class="resize-handle"></div>
       <div class="main-content">
         <div v-if="requestStore.tabs.length > 0" class="tabs-bar">
           <div class="tabs-scroll">
@@ -419,39 +423,6 @@ useShortcuts([
 
 .sidebar-wrapper.collapsed {
   width: 48px;
-}
-
-.resize-handle {
-  width: 3px;
-  min-width: 3px;
-  background: #999;
-  cursor: col-resize;
-  flex-shrink: 0;
-}
-
-.resize-handle:hover {
-  background: #2080f0;
-}
-
-.resize-handle::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--n-border-color);
-  opacity: 0.5;
-}
-
-.resize-handle:hover {
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--n-primary-color) 30%,
-    var(--n-primary-color) 70%,
-    transparent
-  );
 }
 
 .main-layout :deep(.n-split) {

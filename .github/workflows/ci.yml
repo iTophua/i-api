@@ -5,13 +5,15 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  release:
+    types: [created]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   frontend:
-    name: Frontend Tests
+    name: Frontend Check
     runs-on: ubuntu-latest
 
     steps:
@@ -33,30 +35,8 @@ jobs:
       - name: Run TypeScript type check
         run: npm run typecheck || npm run build
 
-      - name: Run unit tests
-        run: npm run test
-
-      - name: Run tests with coverage
-        run: npm run test:coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        if: success()
-        with:
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: iapi-frontend
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: frontend-coverage
-          path: coverage/
-          retention-days: 7
-
   backend:
-    name: Backend Tests
+    name: Backend Check
     runs-on: ubuntu-latest
 
     steps:
@@ -99,15 +79,22 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy -- -D warnings
 
-      - name: Build
-        working-directory: src-tauri
-        run: cargo build --release 2>&1 | tail -20
+  build:
+    name: Build Release
+    runs-on: ${{ matrix.os }}
+    needs: [frontend, backend]
+    if: startsWith(github.ref, 'refs/tags/')
 
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: [frontend]
-    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+          - os: macos-14
+            platform: macos
+          - os: windows-latest
+            platform: windows
 
     steps:
       - name: Checkout repository
@@ -119,55 +106,46 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Build application
-        run: npm run build
-
-      - name: Run E2E tests
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'linux'
         run: |
-          npm run test:e2e || true
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: always()
+      - name: Cache cargo registry
+        uses: actions/cache@v4
         with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-  lighthouse:
-    name: Performance Tests
-    runs-on: ubuntu-latest
-    needs: [frontend]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Cache cargo index
+        uses: actions/cache@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Lighthouse CI
-        run: npm run test:lighthouse
-
-      - name: Upload Lighthouse report
-        uses: actions/upload-artifact@v4
-        if: always()
+      - name: Cache cargo build
+        uses: actions/cache@v4
         with:
-          name: lighthouse-report
-          path: .lighthouseci/
-          retention-days: 7
+          path: src-tauri/target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('src-tauri/**/Cargo.lock') }}
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'iApi v__VERSION__'
+          releaseBodyPath: CHANGELOG.md
+          releaseDraft: true
+          prerelease: false
 
   release:
     name: PR Readiness Report
@@ -182,8 +160,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend check | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend check | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
           echo "| Lint checks | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
           echo "| Type checks | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

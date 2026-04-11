@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { NTooltip } from 'naive-ui'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { NTooltip, NInput } from 'naive-ui'
 import { useEnvironmentStore } from '@/stores/environment'
 
 const props = defineProps<{
@@ -19,8 +19,8 @@ const envStore = useEnvironmentStore()
 const inputValue = ref(props.value)
 const showDropdown = ref(false)
 const highlightedIndex = ref(-1)
-const inputRef = ref<HTMLInputElement | null>(null)
-const mirrorRef = ref<HTMLElement | null>(null)
+const inputRef = ref<InstanceType<typeof NInput> | null>(null)
+const wrapperRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref({ top: 0, left: 0, width: 0 })
 const isMouseInDropdown = ref(false)
 
@@ -136,17 +136,9 @@ const tooltipText = computed(() => {
   }).join('\n')
 })
 
-const inputStatus = computed(() => {
-  if (variableInfos.value.some(v => !v.isValid)) return 'error'
-  if (variableInfos.value.length > 0) return 'success'
-  return undefined
-})
-
 const highlightedHtml = computed(() => {
   const text = inputValue.value
-  if (!text) {
-    return props.placeholder ? `<span class='mirror-placeholder'>${escapeHtml(props.placeholder)}</span>` : ''
-  }
+  if (!text) return ''
 
   const regex = new RegExp('\\{\\{([^}]+)\\}\\}', 'g')
   let result = ''
@@ -188,24 +180,22 @@ function escapeHtml(text: string): string {
 }
 
 function updateDropdownPosition() {
-  const input = inputRef.value
-  if (!input) return
+  const wrapper = wrapperRef.value
+  if (!wrapper) return
 
-  const inputRect = input.getBoundingClientRect()
+  const rect = wrapper.getBoundingClientRect()
   dropdownPosition.value = {
-    top: inputRect.bottom + 4,
-    left: inputRect.left,
-    width: inputRect.width
+    top: rect.bottom + 4,
+    left: rect.left,
+    width: rect.width
   }
 }
 
-function onInput(e: Event) {
-  const v = (e.target as HTMLInputElement).value
-  inputValue.value = v
+function handleInput(value: string) {
+  inputValue.value = value
   highlightedIndex.value = -1
 
-  const currentSuggestions = getSuggestions(v)
-  const shouldShow = hasUnclosedBrace(v)
+  const shouldShow = hasUnclosedBrace(value)
 
   if (shouldShow) {
     showDropdown.value = true
@@ -214,12 +204,11 @@ function onInput(e: Event) {
     showDropdown.value = false
   }
 
-  emit('update:value', v)
+  emit('update:value', value)
 }
 
 function handleKeyDown(e: KeyboardEvent) {
-  const target = e.target as HTMLInputElement
-  const currentValue = target?.value ?? inputValue.value
+  const currentValue = inputValue.value
   const currentSuggestions = getSuggestions(currentValue)
   const shouldShow = hasUnclosedBrace(currentValue)
 
@@ -261,8 +250,12 @@ function handleKeyDown(e: KeyboardEvent) {
       emit('update:value', newValue)
       showDropdown.value = false
       highlightedIndex.value = -1
-      inputRef.value?.setSelectionRange(newValue.length, newValue.length)
-      inputRef.value?.focus()
+      nextTick(() => {
+        const el = inputRef.value?.inputElRef
+        if (el) {
+          el.setSelectionRange(newValue.length, newValue.length)
+        }
+      })
     }
   } else if (e.key === 'Escape') {
     showDropdown.value = false
@@ -275,8 +268,12 @@ function handleKeyDown(e: KeyboardEvent) {
       emit('update:value', newValue)
       showDropdown.value = false
       highlightedIndex.value = -1
-      inputRef.value?.setSelectionRange(newValue.length, newValue.length)
-      inputRef.value?.focus()
+      nextTick(() => {
+        const el = inputRef.value?.inputElRef
+        if (el) {
+          el.setSelectionRange(newValue.length, newValue.length)
+        }
+      })
     } else {
       showDropdown.value = false
     }
@@ -290,10 +287,6 @@ function handleFocus() {
     showDropdown.value = true
     updateDropdownPosition()
   }
-
-  requestAnimationFrame(() => {
-    inputRef.value?.setSelectionRange(inputValue.value.length, inputValue.value.length)
-  })
 }
 
 function handleBlur() {
@@ -326,8 +319,13 @@ function handleItemClick(suggestion: { label: string; value: string }) {
   highlightedIndex.value = -1
   isMouseInDropdown.value = false
 
-  inputRef.value?.setSelectionRange(newValue.length, newValue.length)
-  inputRef.value?.focus()
+  nextTick(() => {
+    const el = inputRef.value?.inputElRef
+    if (el) {
+      el.setSelectionRange(newValue.length, newValue.length)
+      el.focus()
+    }
+  })
 }
 
 function handleScroll() {
@@ -348,22 +346,17 @@ onUnmounted(() => {
 <template>
   <NTooltip :disabled="!tooltipText" :show-arrow="false">
     <template #trigger>
-      <div class="variable-input-wrapper" :class="[`size-${size || 'small'}`, { disabled }]">
-        <div
-          ref="mirrorRef"
-          class="input-mirror"
-          aria-hidden="true"
-          v-html="highlightedHtml"
-        ></div>
-        <input
+      <div ref="wrapperRef" class="variable-input-wrapper">
+        <div class="input-mirror" aria-hidden="true" v-html="highlightedHtml || (placeholder ? `<span class='mirror-placeholder'>${escapeHtml(placeholder)}</span>` : '')"></div>
+        <NInput
           ref="inputRef"
-          type="text"
-          class="variable-native-input"
-          autocomplete="off"
-          spellcheck="false"
           :value="inputValue"
+          :placeholder="placeholder"
+          :size="size || 'small'"
           :disabled="disabled"
-          @input="onInput"
+          :input-props="{ autocomplete: 'off', spellcheck: 'false' }"
+          class="variable-input"
+          @update:value="handleInput"
           @keydown="handleKeyDown"
           @focus="handleFocus"
           @blur="handleBlur"
@@ -417,49 +410,26 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.variable-input-wrapper.size-small {
-  height: 32px;
-}
-
-.variable-input-wrapper.size-medium {
-  height: 40px;
-}
-
-.variable-input-wrapper.size-large {
-  height: 48px;
-}
-
-.variable-input-wrapper.disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 .input-mirror {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  padding: 6px 12px;
+  bottom: 0;
+  padding: 0 9.5px;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 28px;
   font-family: inherit;
   pointer-events: none;
-  white-space: pre-wrap;
-  word-break: break-all;
-  border-radius: 3px;
-  z-index: 0;
-  color: var(--n-text-color, #333);
-  box-sizing: border-box;
+  white-space: pre;
+  z-index: 1;
   overflow: hidden;
-  max-height: 100%;
 }
 
 .input-mirror :deep(.var-chip) {
   color: #18a058;
-  font-weight: 500;
   background: rgba(24, 160, 88, 0.08);
   border-radius: 3px;
-  padding: 0 2px;
 }
 
 .input-mirror :deep(.var-invalid) {
@@ -467,42 +437,34 @@ onUnmounted(() => {
   background: rgba(208, 48, 80, 0.08);
 }
 
-.input-mirror :deep(.mirror-placeholder) {
-  color: var(--n-placeholder-color, #aaa);
-}
-
-.variable-native-input {
+.variable-input {
   position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  padding: 6px 12px;
-  border: 1px solid var(--n-border-color, #e0e0e0);
-  border-radius: 3px;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--n-text-color, #333);
-  font-size: 14px;
-  font-family: inherit;
-  line-height: 1.5;
-  outline: none;
-  -webkit-text-fill-color: transparent;
-  cursor: text;
-  box-sizing: border-box;
+  z-index: 0;
 }
 
-.variable-native-input::selection {
+.variable-input :deep(.n-input) {
+  height: 28px;
+}
+
+.variable-input :deep(.n-input .n-input__border),
+.variable-input :deep(.n-input .n-input__state-border) {
+  display: none;
+}
+
+.variable-input :deep(.n-input__input-el) {
+  color: transparent !important;
+  caret-color: #18a058;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.variable-input :deep(.n-input__input-el)::selection {
   background: rgba(24, 128, 56, 0.25);
-  -webkit-text-fill-color: transparent;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
 }
 
-.variable-native-input:focus {
-  border-color: var(--n-color-primary, #18a058);
-  box-shadow: 0 0 0 2px rgba(24, 160, 88, 0.15);
-}
-
-.variable-native-input:disabled {
-  cursor: not-allowed;
+.variable-input :deep(.n-input__placeholder) {
+  opacity: 0;
 }
 
 .var-indicator {
@@ -617,52 +579,61 @@ onUnmounted(() => {
   color: #d03050;
 }
 
-:global(.dark) .variable-suggest-dropdown {
+:global(.input-mirror) {
+  color: rgba(0, 0, 0, 0.9);
+}
+
+:global(.input-mirror .mirror-placeholder) {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+:global([data-theme='dark'] .input-mirror) {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+:global([data-theme='dark'] .input-mirror .mirror-placeholder) {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+:global([data-theme='dark'] .variable-suggest-dropdown) {
   background: var(--n-color, #333);
   border-color: var(--n-border-color, #444);
 }
 
-:global(.dark) .input-mirror :deep(.var-chip) {
+:global([data-theme='dark'] .input-mirror .var-chip) {
   color: #63e2b7;
   background: rgba(99, 226, 183, 0.12);
 }
 
-:global(.dark) .input-mirror :deep(.var-invalid) {
+:global([data-theme='dark'] .input-mirror .var-invalid) {
   color: #f5a5a5;
   background: rgba(245, 165, 165, 0.12);
 }
 
-:global(.dark) .input-mirror :deep(.mirror-placeholder) {
-  color: var(--n-placeholder-color, #666);
+:global([data-theme='dark'] .variable-input .n-input__input-el) {
+  color: transparent !important;
+  caret-color: rgba(255, 255, 255, 0.9);
+  -webkit-text-fill-color: transparent !important;
 }
 
-:global(.dark) .variable-native-input {
-  caret-color: var(--n-text-color, #eee);
-}
-
-:global(.dark) .variable-native-input:focus {
-  border-color: #63e2b7;
-  box-shadow: 0 0 0 2px rgba(99, 226, 183, 0.15);
-}
-
-:global(.dark) .variable-suggest-item {
+:global([data-theme='dark'] .variable-suggest-item) {
   color: var(--n-text-color, #eee);
 }
 
-:global(.dark) .variable-suggest-item:hover,
-:global(.dark) .variable-suggest-item.highlighted {
+:global([data-theme='dark'] .variable-suggest-item:hover),
+:global([data-theme='dark'] .variable-suggest-item.highlighted) {
   background: var(--n-color-hover, #444);
 }
 
-:global(.dark) .variable-suggest-empty {
+:global([data-theme='dark'] .variable-suggest-empty) {
   color: var(--n-text-color-3, #888);
 }
 
-:global(.dark) .suggestion-value {
+:global([data-theme='dark'] .suggestion-value) {
   color: var(--n-text-color-3, #888);
 }
 
-:global(.dark) .tooltip-arrow {
+:global([data-theme='dark'] .tooltip-arrow) {
   color: var(--n-text-color-3, #888);
 }
 </style>

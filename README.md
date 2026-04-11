@@ -95,3 +95,7 @@ i-api/
 ## 许可证
 
 MIT
+
+## 更新日志
+
+详细更新记录请查看 [CHANGELOG.md](./CHANGELOG.md)。

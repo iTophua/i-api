@@ -161,10 +161,10 @@ function selectHistory(history: RequestHistory) {
       description: '',
       method: isValidHttpMethod(history.method) ? history.method : 'GET',
       url: history.url,
-      params: [],
-      headers: [],
-      body: { mode: 'none' },
-      auth: { type: 'none' },
+      params: history.params || [],
+      headers: history.headers || [],
+      body: history.body || { mode: 'none' },
+      auth: history.auth || { type: 'none' },
       preScript: '',
       postScript: '',
       createdAt: now,
@@ -351,16 +351,21 @@ watch(
             :style="getDraggingStyle()"
           >
             <div class="item-content">
-              <AppIcon
-                :type="dragState.dragExpanded ? 'chevronDown' : 'chevronRight'"
-                :size="14"
-                class="expand-icon"
-              />
-              <AppIcon
-                :type="dragState.dragExpanded ? 'folderOpen' : 'folder'"
-                :size="16"
-                class="item-icon"
-              />
+              <template v-if="dragState.type === 'collection'">
+                <AppIcon
+                  :type="dragState.dragExpanded ? 'chevronDown' : 'chevronRight'"
+                  :size="14"
+                  class="expand-icon"
+                />
+                <AppIcon
+                  :type="dragState.dragExpanded ? 'folderOpen' : 'folder'"
+                  :size="16"
+                  class="item-icon"
+                />
+              </template>
+              <template v-else-if="dragState.type === 'request'">
+                <HttpMethodIcon :method="dragState.dragMethod || 'GET'" :size="12" filled />
+              </template>
               <span class="item-name">{{ dragState.dragName }}</span>
             </div>
           </div>
@@ -457,31 +462,65 @@ watch(
                 @contextmenu="handleRequestContextMenu($event, request, collection.id)"
                 @mousedown="handleRequestDragStart($event, request, collection.id, requestIndex)"
               >
-                <div
-                  v-if="requestStore.isSelectionMode"
-                  class="selection-checkbox"
-                  @click.stop="toggleRequestSelection(request.id)"
-                >
-                  <AppIcon
-                    :type="requestStore.isInSelection(request.id) ? 'check' : 'plus'"
-                    :size="14"
-                  />
+                <div class="item-content">
+                  <div
+                    v-if="requestStore.isSelectionMode"
+                    class="selection-checkbox"
+                    @click.stop="toggleRequestSelection(request.id)"
+                  >
+                    <AppIcon
+                      :type="requestStore.isInSelection(request.id) ? 'check' : 'plus'"
+                      :size="14"
+                    />
+                  </div>
+                  <HttpMethodIcon :method="request.method" :size="12" filled />
+                  <template v-if="editingId === request.id && editingType === 'request'">
+                    <input
+                      v-model="editingName"
+                      :class="`rename-input-${request.id}`"
+                      class="rename-input"
+                      @blur="finishRename"
+                      @keyup.enter="finishRename"
+                      @keyup.escape="cancelRename"
+                      @click.stop
+                    />
+                  </template>
+                  <template v-else>
+                    <span class="item-name">{{ request.name }}</span>
+                  </template>
                 </div>
-                <HttpMethodIcon :method="request.method" :size="12" filled />
-                <template v-if="editingId === request.id && editingType === 'request'">
-                  <input
-                    v-model="editingName"
-                    :class="`rename-input-${request.id}`"
-                    class="rename-input"
-                    @blur="finishRename"
-                    @keyup.enter="finishRename"
-                    @keyup.escape="cancelRename"
-                    @click.stop
-                  />
-                </template>
-                <template v-else>
-                  <span class="item-name">{{ request.name }}</span>
-                </template>
+                <div class="item-actions" :class="{ 'is-hidden': editingId === request.id }">
+                  <NTooltip :show-arrow="false" placement="top">
+                    <template #trigger>
+                      <NButton
+                        size="small"
+                        quaternary
+                        class="action-btn"
+                        @click.stop="startRename(request.id, request.name, 'request')"
+                      >
+                        <template #icon>
+                          <AppIcon type="edit" class="btn-icon edit-icon" />
+                        </template>
+                      </NButton>
+                    </template>
+                    {{ t('common.rename') }}
+                  </NTooltip>
+                  <NTooltip :show-arrow="false" placement="top">
+                    <template #trigger>
+                      <NButton
+                        size="small"
+                        quaternary
+                        class="action-btn delete-btn"
+                        @click.stop="requestStore.deleteRequest(collection.id, request.id)"
+                      >
+                        <template #icon>
+                          <AppIcon type="trash" class="btn-icon delete-icon" />
+                        </template>
+                      </NButton>
+                    </template>
+                    {{ t('common.delete') }}
+                  </NTooltip>
+                </div>
               </div>
             </template>
           </div>
@@ -572,6 +611,7 @@ watch(
   flex-direction: column;
   position: relative;
   background: var(--n-color);
+  overflow: hidden;
 }
 
 .sidebar::after {
@@ -581,20 +621,20 @@ watch(
   right: 0;
   bottom: 0;
   width: 1px;
-  background: var(--n-border-color);
+  background: var(--color-border, #e5e7eb) !important;
   pointer-events: none;
+  z-index: 9999;
 }
 
-.sidebar-content,
-.sidebar-scroll {
-  position: relative;
-  z-index: 1;
+:global([data-theme='dark']) .sidebar::after {
+  background: #404040 !important;
 }
 
 .sidebar.collapsed {
   width: 48px;
   min-width: 48px;
   max-width: 48px;
+  justify-content: flex-end;
 }
 
 .sidebar.collapsed .sidebar-tabs,

@@ -68,14 +68,14 @@ async function handleConfirm() {
     if (props.mode === 'copy') {
       await requestStore.batchCopyRequests(
         selectedTarget.value.collectionId,
-        selectedTarget.value.folderId,
+        selectedTarget.value.folderId ?? null,
         props.requestIds
       )
     } else {
       await requestStore.batchMoveRequests(
         props.collectionId,
         selectedTarget.value.collectionId,
-        selectedTarget.value.folderId,
+        selectedTarget.value.folderId ?? null,
         props.requestIds
       )
     }
