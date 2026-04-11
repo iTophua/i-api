@@ -139,7 +139,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('src-tauri/**/Cargo.lock') }}
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.5.25
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
