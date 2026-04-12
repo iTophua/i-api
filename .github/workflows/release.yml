@@ -81,6 +81,7 @@ jobs:
         run: pnpm exec tauri build --target ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI: false
 
       - name: Upload artifacts (macOS)
         if: matrix.os == 'macos-latest'
