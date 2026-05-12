@@ -175,7 +175,11 @@ export default {
     toggleSidebar: 'Toggle Sidebar',
     openSettings: 'Open Settings',
     closeTab: 'Close Tab',
-    switchTab: 'Switch Tab',
+    importCurl: 'Import cURL',
+    openEnvironment: 'Open Environment Manager',
+    openHistory: 'Open History',
+    nextTab: 'Next Tab',
+    prevTab: 'Previous Tab',
   },
   errors: {
     networkError: 'Network error, please check your connection',

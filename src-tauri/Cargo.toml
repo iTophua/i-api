@@ -1,6 +1,6 @@
 [package]
 name = "iapi"
-version = "0.1.0"
+version = "0.1.1"
 description = "轻量、快速、中文的 API 测试工具"
 authors = ["iApi Team"]
 license = "MIT"

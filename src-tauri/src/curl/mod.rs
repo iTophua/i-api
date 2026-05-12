@@ -201,7 +201,31 @@ pub fn parse_curl(curl_command: &str) -> Result<HttpRequest, String> {
             }
             _ => {
                 if token.starts_with("http://") || token.starts_with("https://") {
+                    // 保持 URL 完整
                     request.url = token.clone();
+                    // 解析 URL 中的查询参数到 params
+                    if let Some((_, query_string)) = token.split_once('?') {
+                        for param_pair in query_string.split('&') {
+                            if let Some((key, value)) = param_pair.split_once('=') {
+                                let decoded_key = urlencoding_decode(key);
+                                let decoded_value = urlencoding_decode(value);
+                                request.params.push(crate::models::KeyValuePair {
+                                    key: decoded_key,
+                                    value: decoded_value,
+                                    description: None,
+                                    enabled: true,
+                                });
+                            } else if !param_pair.is_empty() {
+                                let decoded_key = urlencoding_decode(param_pair);
+                                request.params.push(crate::models::KeyValuePair {
+                                    key: decoded_key,
+                                    value: String::new(),
+                                    description: None,
+                                    enabled: true,
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -595,6 +619,36 @@ fn extract_filename(header: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// URL 解码函数
+fn urlencoding_decode(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars();
+
+    while let Some(ch) = chars.next() {
+        if ch == '%' {
+            // 读取两个十六进制字符
+            let hex: String = chars.by_ref().take(2).collect();
+            if hex.len() == 2 {
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    result.push(byte as char);
+                } else {
+                    result.push('%');
+                    result.push_str(&hex);
+                }
+            } else {
+                result.push('%');
+                result.push_str(&hex);
+            }
+        } else if ch == '+' {
+            result.push(' ');
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
 }
 
 /// 解释 ANSI-C 引用中的转义序列（bash $'...' 格式）

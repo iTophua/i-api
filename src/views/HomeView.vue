@@ -222,15 +222,119 @@ watch(collapsed, (val) => {
 })
 
 useShortcuts([
-  { key: 'Enter', ctrl: true, handler: sendRequest, description: t('shortcuts.sendRequest') },
-  { key: 's', ctrl: true, handler: saveRequest, description: t('shortcuts.saveRequest') },
-  { key: 'n', ctrl: true, handler: newRequest, description: t('shortcuts.newRequest') },
-  { key: 'b', ctrl: true, handler: toggleSidebar, description: t('shortcuts.toggleSidebar') },
   {
+    id: 'sendRequest',
+    key: 'Enter',
+    ctrl: true,
+    handler: sendRequest,
+    description: t('shortcuts.sendRequest'),
+    category: 'global',
+  },
+  {
+    id: 'saveRequest',
+    key: 's',
+    ctrl: true,
+    handler: saveRequest,
+    description: t('shortcuts.saveRequest'),
+    category: 'global',
+  },
+  {
+    id: 'newRequest',
+    key: 'n',
+    ctrl: true,
+    handler: newRequest,
+    description: t('shortcuts.newRequest'),
+    category: 'global',
+  },
+  {
+    id: 'closeTab',
+    key: 'w',
+    ctrl: true,
+    handler: () => {
+      if (requestStore.activeTabId) {
+        requestStore.closeTab(requestStore.activeTabId)
+      }
+    },
+    description: t('shortcuts.closeTab'),
+    category: 'global',
+  },
+  {
+    id: 'importCurl',
+    key: 'i',
+    ctrl: true,
+    shift: true,
+    handler: () => (showCurlImport.value = true),
+    description: t('shortcuts.importCurl'),
+    category: 'global',
+  },
+  {
+    id: 'openEnvironment',
+    key: 'e',
+    ctrl: true,
+    shift: true,
+    handler: () => (showEnvironmentManager.value = true),
+    description: t('shortcuts.openEnvironment'),
+    category: 'global',
+  },
+  {
+    id: 'openHistory',
+    key: 'h',
+    ctrl: true,
+    shift: true,
+    handler: () => {
+      const event = new CustomEvent('toggle-history')
+      window.dispatchEvent(event)
+    },
+    description: t('shortcuts.openHistory'),
+    category: 'global',
+  },
+  {
+    id: 'openSettings',
     key: ',',
     ctrl: true,
     handler: () => (showSettings.value = true),
     description: t('shortcuts.openSettings'),
+    category: 'global',
+  },
+  {
+    id: 'toggleSidebar',
+    key: 'b',
+    ctrl: true,
+    handler: toggleSidebar,
+    description: t('shortcuts.toggleSidebar'),
+    category: 'global',
+  },
+  {
+    id: 'nextTab',
+    key: 'ArrowRight',
+    ctrl: true,
+    handler: () => {
+      const tabs = requestStore.tabs
+      const currentIndex = tabs.findIndex((t) => t.id === requestStore.activeTabId)
+      if (currentIndex < tabs.length - 1) {
+        requestStore.switchTab(tabs[currentIndex + 1].id)
+      } else if (tabs.length > 0) {
+        requestStore.switchTab(tabs[0].id)
+      }
+    },
+    description: t('shortcuts.nextTab'),
+    category: 'global',
+  },
+  {
+    id: 'prevTab',
+    key: 'ArrowLeft',
+    ctrl: true,
+    handler: () => {
+      const tabs = requestStore.tabs
+      const currentIndex = tabs.findIndex((t) => t.id === requestStore.activeTabId)
+      if (currentIndex > 0) {
+        requestStore.switchTab(tabs[currentIndex - 1].id)
+      } else if (tabs.length > 0) {
+        requestStore.switchTab(tabs[tabs.length - 1].id)
+      }
+    },
+    description: t('shortcuts.prevTab'),
+    category: 'global',
   },
 ])
 </script>

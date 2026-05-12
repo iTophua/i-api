@@ -26,6 +26,73 @@ const createDefaultRequest = (): Request => ({
   updatedAt: new Date().toISOString(),
 })
 
+// 解析 URL 中的查询参数
+function parseUrlParams(url: string): { baseUrl: string; params: KeyValuePair[] } {
+  const questionMarkIndex = url.indexOf('?')
+  if (questionMarkIndex === -1) {
+    return { baseUrl: url, params: [] }
+  }
+
+  const baseUrl = url.substring(0, questionMarkIndex)
+  const queryString = url.substring(questionMarkIndex + 1)
+  const params: KeyValuePair[] = []
+
+  if (queryString) {
+    for (const paramPair of queryString.split('&')) {
+      if (!paramPair) continue
+      const equalIndex = paramPair.indexOf('=')
+      if (equalIndex === -1) {
+        // 只有 key 没有 value
+        params.push({
+          id: crypto.randomUUID(),
+          key: decodeURIComponent(paramPair),
+          value: '',
+          description: '',
+          enabled: true,
+        })
+      } else {
+        const key = paramPair.substring(0, equalIndex)
+        const value = paramPair.substring(equalIndex + 1)
+        params.push({
+          id: crypto.randomUUID(),
+          key: decodeURIComponent(key),
+          value: decodeURIComponent(value),
+          description: '',
+          enabled: true,
+        })
+      }
+    }
+  }
+
+  return { baseUrl, params }
+}
+
+// 从 params 重建 URL 查询字符串
+function buildUrlWithParams(baseUrl: string, params: KeyValuePair[]): string {
+  const enabledParams = params.filter((p) => p.enabled && p.key)
+  if (enabledParams.length === 0) {
+    // 移除已有的查询参数
+    const questionMarkIndex = baseUrl.indexOf('?')
+    if (questionMarkIndex !== -1) {
+      return baseUrl.substring(0, questionMarkIndex)
+    }
+    return baseUrl
+  }
+
+  const queryString = enabledParams
+    .map(
+      (p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
+    )
+    .join('&')
+
+  // 移除已有的查询参数
+  const questionMarkIndex = baseUrl.indexOf('?')
+  const cleanBaseUrl =
+    questionMarkIndex !== -1 ? baseUrl.substring(0, questionMarkIndex) : baseUrl
+
+  return `${cleanBaseUrl}?${queryString}`
+}
+
 export const useRequestStore = defineStore('request', () => {
   const collections = ref<Collection[]>([])
   const tabs = ref<RequestTab[]>([])
@@ -223,7 +290,32 @@ export const useRequestStore = defineStore('request', () => {
   }
 
   function updateUrl(url: string) {
-    updateRequest({ url })
+    // 解析 URL 中的查询参数
+    const { params: urlParams } = parseUrlParams(url)
+    
+    // 获取当前参数
+    const currentParams = currentTab.value?.request.params || []
+    
+    // 创建 URL 参数的 key 集合
+    const urlParamKeys = new Set(urlParams.map(p => p.key))
+    
+    // 保留手动禁用的参数（不在 URL 中且原本是禁用状态）
+    const disabledParams = currentParams
+      .filter(p => !urlParamKeys.has(p.key) && p.key && !p.enabled)
+    
+    // 合并：URL 参数（启用）+ 手动禁用的参数
+    const mergedParams = [...urlParams, ...disabledParams]
+    
+    // 直接更新，不触发 updateParams
+    if (!currentTab.value) return
+    const updatedRequest = {
+      ...JSON.parse(JSON.stringify(currentTab.value.request)),
+      url,
+      params: mergedParams,
+      updatedAt: new Date().toISOString(),
+    }
+    currentTab.value.request = updatedRequest
+    currentTab.value.isDirty = true
   }
 
   function updateMethod(method: Request['method']) {
@@ -231,7 +323,10 @@ export const useRequestStore = defineStore('request', () => {
   }
 
   function updateParams(params: KeyValuePair[]) {
-    updateRequest({ params })
+    // 从 params 重建 URL
+    const currentUrl = currentTab.value?.request.url || ''
+    const newUrl = buildUrlWithParams(currentUrl, params)
+    updateRequest({ params, url: newUrl })
   }
 
   function updateHeaders(headers: KeyValuePair[]) {

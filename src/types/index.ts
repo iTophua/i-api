@@ -165,6 +165,14 @@ export interface Response {
   responseSize: number
 }
 
+export interface ShortcutBinding {
+  key: string
+  ctrl?: boolean
+  shift?: boolean
+  alt?: boolean
+  meta?: boolean
+}
+
 export interface Settings {
   theme: 'light' | 'dark' | 'system'
   language: Locale
@@ -181,6 +189,7 @@ export interface Settings {
   }
   followRedirects?: boolean
   verifySsl?: boolean
+  shortcuts?: Record<string, ShortcutBinding | null>
 }
 
 export type TreeNode = Collection | Folder | Request

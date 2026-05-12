@@ -177,7 +177,11 @@ export default {
     toggleSidebar: '切换侧边栏',
     openSettings: '打开设置',
     closeTab: '关闭标签页',
-    switchTab: '切换标签页',
+    importCurl: '导入 cURL',
+    openEnvironment: '打开环境管理',
+    openHistory: '打开历史记录',
+    nextTab: '下一个标签页',
+    prevTab: '上一个标签页',
   },
   errors: {
     networkError: '网络错误，请检查网络连接',

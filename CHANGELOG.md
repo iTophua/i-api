@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-12
+
+### Fixed
+
+- 修复 URL 参数同步时禁用参数被错误保留的问题（输入 `?te` 时不再出现多余的临时参数）
+
 ## [0.1.0] - 2026-04-11
 
 ### Added
