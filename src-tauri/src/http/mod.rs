@@ -325,6 +325,9 @@ fn build_url_with_auth(
     params: &[KeyValuePair],
     auth: &Option<crate::models::AuthConfig>,
 ) -> String {
+    // 移除 URL 中已有的查询参数，避免与 params 数组中的参数重复
+    let clean_base = base_url.split('?').next().unwrap_or(base_url);
+
     let mut all_params: Vec<KeyValuePair> = params.iter().filter(|p| p.enabled).cloned().collect();
 
     if let Some(auth_config) = auth {
@@ -343,7 +346,7 @@ fn build_url_with_auth(
     }
 
     if all_params.is_empty() {
-        return base_url.to_string();
+        return clean_base.to_string();
     }
 
     let query = all_params
@@ -358,11 +361,7 @@ fn build_url_with_auth(
         .collect::<Vec<_>>()
         .join("&");
 
-    if base_url.contains('?') {
-        format!("{}&{}", base_url, query)
-    } else {
-        format!("{}?{}", base_url, query)
-    }
+    format!("{}?{}", clean_base, query)
 }
 
 fn parse_method(method: &str) -> reqwest::Method {
