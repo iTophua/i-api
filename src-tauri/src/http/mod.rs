@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::models::{HttpRequest, HttpResponse, KeyValuePair, ProxyConfig};
+use crate::models::{HttpRequest, HttpResponse, KeyValuePair};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
@@ -80,6 +80,24 @@ fn build_client(request: &HttpRequest) -> Result<Client, String> {
         }
     }
 
+    if let Some(proxy_config) = &request.proxy {
+        if proxy_config.enabled {
+            let proxy_url = format!("http://{}:{}", proxy_config.host, proxy_config.port);
+            let mut proxy = reqwest::Proxy::all(&proxy_url)
+                .map_err(|e| format!("代理配置错误: {}", e))?;
+
+            if let (Some(username), Some(password)) = (&proxy_config.username, &proxy_config.password) {
+                proxy = proxy.basic_auth(username, password);
+            }
+
+            builder = builder.proxy(proxy);
+        } else {
+            builder = builder.no_proxy();
+        }
+    } else {
+        builder = builder.no_proxy();
+    }
+
     builder
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))
@@ -110,13 +128,7 @@ async fn send_request_internal(
     request: HttpRequest,
     cancellation_token: tokio_util::sync::CancellationToken,
 ) -> Result<HttpResponse, String> {
-    let mut url = build_url_with_auth(&request.url, &request.params, &request.auth);
-
-    if let Some(proxy) = &request.proxy {
-        if proxy.enabled {
-            url = apply_proxy(&url, proxy);
-        }
-    }
+    let url = build_url_with_auth(&request.url, &request.params, &request.auth);
 
     let method = parse_method(&request.method);
 
@@ -136,7 +148,7 @@ async fn send_request_internal(
 
     tokio::select! {
         result = req_builder.send() => {
-            let response = result.map_err(|e| e.to_string())?;
+            let response = result.map_err(|e| format_reqwest_error(&e))?;
             let response_time = start.elapsed().as_millis() as u64;
 
             let status = response.status().as_u16();
@@ -224,13 +236,7 @@ async fn send_request_stream_internal<F>(
 where
     F: FnMut(Vec<u8>, HashMap<String, String>, u16, std::time::Instant) + Send + 'static,
 {
-    let mut url = build_url_with_auth(&request.url, &request.params, &request.auth);
-
-    if let Some(proxy) = &request.proxy {
-        if proxy.enabled {
-            url = apply_proxy(&url, proxy);
-        }
-    }
+    let url = build_url_with_auth(&request.url, &request.params, &request.auth);
 
     let method = parse_method(&request.method);
 
@@ -248,7 +254,7 @@ where
 
     tokio::select! {
         result = req_builder.send() => {
-            let response = result.map_err(|e| e.to_string())?;
+            let response = result.map_err(|e| format_reqwest_error(&e))?;
 
             let status = response.status().as_u16();
             let status_text = response.status().canonical_reason().unwrap_or("").to_string();
@@ -296,28 +302,34 @@ where
     }
 }
 
-fn apply_proxy(url: &str, proxy: &ProxyConfig) -> String {
-    let parsed_url = match reqwest::Url::parse(url) {
-        Ok(u) => u,
-        Err(_) => return url.to_string(),
-    };
-    let scheme = parsed_url.scheme();
+fn format_reqwest_error(e: &reqwest::Error) -> String {
+    let mut msg = String::new();
 
-    match scheme {
-        "http" => format!(
-            "http://{}@{}:{}",
-            proxy.host,
-            proxy.port,
-            url.trim_start_matches("http://")
-        ),
-        "https" => format!(
-            "https://{}@{}:{}",
-            proxy.host,
-            proxy.port,
-            url.trim_start_matches("https://")
-        ),
-        _ => url.to_string(),
+    if e.is_timeout() {
+        msg.push_str("请求超时");
+    } else if e.is_connect() {
+        msg.push_str("连接失败");
+    } else if e.is_redirect() {
+        msg.push_str("重定向过多");
+    } else if e.is_request() {
+        msg.push_str("请求构造失败");
+    } else if e.is_body() {
+        msg.push_str("请求体发送失败");
+    } else if e.is_decode() {
+        msg.push_str("响应解码失败");
+    } else {
+        msg.push_str("请求失败");
     }
+
+    if let Some(url) = e.url() {
+        msg.push_str(&format!(" ({})", url));
+    }
+
+    if let Some(source) = std::error::Error::source(e) {
+        msg.push_str(&format!(": {}", source));
+    }
+
+    msg
 }
 
 fn build_url_with_auth(
@@ -377,6 +389,13 @@ fn parse_method(method: &str) -> reqwest::Method {
     }
 }
 
+fn is_valid_header_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || "!#$%&'*+-.^_`|~".contains(c))
+}
+
 fn add_headers(
     builder: reqwest::RequestBuilder,
     headers: &[KeyValuePair],
@@ -387,6 +406,9 @@ fn add_headers(
 
     for header in headers.iter().filter(|h| h.enabled) {
         if skip_content_type && header.key.eq_ignore_ascii_case("Content-Type") {
+            continue;
+        }
+        if !is_valid_header_name(&header.key) {
             continue;
         }
         builder = builder.header(&header.key, &header.value);

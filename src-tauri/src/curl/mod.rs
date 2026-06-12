@@ -65,11 +65,38 @@ pub fn parse_curl(curl_command: &str) -> Result<HttpRequest, String> {
                                         });
                                     }
                                 }
+                            } else {
+                                request.headers.push(KeyValuePair {
+                                    key,
+                                    value,
+                                    description: None,
+                                    enabled: true,
+                                });
                             }
                         } else {
                             request.headers.push(KeyValuePair {
                                 key,
                                 value,
+                                description: None,
+                                enabled: true,
+                            });
+                        }
+                    } else if let Some((key, _)) = header.split_once(';') {
+                        let key = key.trim().to_string();
+                        if !key.is_empty() {
+                            request.headers.push(KeyValuePair {
+                                key,
+                                value: String::new(),
+                                description: None,
+                                enabled: true,
+                            });
+                        }
+                    } else {
+                        let trimmed = header.trim();
+                        if !trimmed.is_empty() {
+                            request.headers.push(KeyValuePair {
+                                key: trimmed.to_string(),
+                                value: String::new(),
                                 description: None,
                                 enabled: true,
                             });
@@ -191,6 +218,37 @@ pub fn parse_curl(curl_command: &str) -> Result<HttpRequest, String> {
                 if i + 1 < tokens.len() {
                     request.headers.push(KeyValuePair {
                         key: "Cookie".to_string(),
+                        value: tokens[i + 1].clone(),
+                        description: None,
+                        enabled: true,
+                    });
+                    i += 2;
+                    continue;
+                }
+            }
+            "-k" | "--insecure" => {
+                request.verify_ssl = Some(false);
+                i += 1;
+                continue;
+            }
+            "-L" | "--location" => {
+                request.follow_redirects = Some(true);
+                i += 1;
+                continue;
+            }
+            "--compressed" | "-s" | "--silent" | "-S" | "--show-error" | "-v" | "--verbose"
+            | "-#" | "--progress-bar" | "-i" | "--include" | "-I" | "--head" => {
+                i += 1;
+                continue;
+            }
+            "--max-time" | "-m" | "--connect-timeout" => {
+                i += 2;
+                continue;
+            }
+            "-e" | "--referer" => {
+                if i + 1 < tokens.len() {
+                    request.headers.push(KeyValuePair {
+                        key: "Referer".to_string(),
                         value: tokens[i + 1].clone(),
                         description: None,
                         enabled: true,
@@ -591,6 +649,84 @@ mod tests {
         assert_eq!(form_data[0].value, "1961350648283152385");
         assert_eq!(form_data[1].key, "timeCategory");
         assert_eq!(form_data[1].value, "month");
+    }
+
+    #[test]
+    fn test_parse_insecure_flag() {
+        let curl = "curl 'http://example.com/api' --insecure";
+        let result = parse_curl(curl).unwrap();
+        assert_eq!(result.verify_ssl, Some(false));
+    }
+
+    #[test]
+    fn test_parse_insecure_short() {
+        let curl = "curl -k 'https://example.com/api'";
+        let result = parse_curl(curl).unwrap();
+        assert_eq!(result.verify_ssl, Some(false));
+    }
+
+    #[test]
+    fn test_parse_header_with_semicolon_no_value() {
+        let curl = "curl 'http://example.com/api' -H 'X-Service;'";
+        let result = parse_curl(curl).unwrap();
+        let service_headers: Vec<_> = result
+            .headers
+            .iter()
+            .filter(|h| h.key == "X-Service")
+            .collect();
+        assert_eq!(service_headers.len(), 1);
+        assert_eq!(service_headers[0].key, "X-Service");
+        assert_eq!(service_headers[0].value, "");
+    }
+
+    #[test]
+    fn test_parse_skip_unknown_flags() {
+        let curl = "curl --compressed --silent -v 'http://example.com/api'";
+        let result = parse_curl(curl).unwrap();
+        assert_eq!(result.url, "http://example.com/api");
+    }
+
+    #[test]
+    fn test_parse_complex_real_world_curl() {
+        let curl = r#"curl 'http://172.1.70.14:18081/api/test?foo=bar' \
+  -H 'Accept: application/json, text/plain, */*' \
+  -H 'Authorization: 16aeb37cd9b7b77008cb53207a4a9b1b' \
+  -H 'X-Access-Token: 16aeb37cd9b7b77008cb53207a4a9b1b' \
+  -H 'X-Service;' \
+  -H 'X-Tenant-Id: 8888' \
+  -b '_webtracing_device_id=t_13526a67' \
+  -H 'Referer: http://172.1.70.14:18081/neo/test' \
+  --insecure"#;
+
+        let result = parse_curl(curl).unwrap();
+        assert_eq!(result.url, "http://172.1.70.14:18081/api/test?foo=bar");
+        assert_eq!(result.verify_ssl, Some(false));
+
+        let auth_header = result
+            .headers
+            .iter()
+            .find(|h| h.key == "Authorization")
+            .unwrap();
+        assert_eq!(auth_header.value, "16aeb37cd9b7b77008cb53207a4a9b1b");
+
+        let service_headers: Vec<_> = result
+            .headers
+            .iter()
+            .filter(|h| h.key == "X-Service")
+            .collect();
+        assert_eq!(service_headers.len(), 1);
+        assert_eq!(service_headers[0].value, "");
+
+        let cookie_header = result
+            .headers
+            .iter()
+            .find(|h| h.key == "Cookie")
+            .unwrap();
+        assert_eq!(cookie_header.value, "_webtracing_device_id=t_13526a67");
+
+        assert_eq!(result.params.len(), 1);
+        assert_eq!(result.params[0].key, "foo");
+        assert_eq!(result.params[0].value, "bar");
     }
 }
 
