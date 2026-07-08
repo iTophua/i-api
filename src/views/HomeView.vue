@@ -104,9 +104,9 @@ function handleCodeSelect(key: string) {
 }
 
 function copyAsCurl() {
-  const curl = generateCode(requestStore.currentRequest, 'curl')
+  const curl = generateCode(requestStore.currentRequest, 'curl', { includeDependencies: false })
   navigator.clipboard.writeText(curl)
-  message.success(t('common.copy') + ' cURL')
+  message.success(t('request.copyAsCurl'))
 }
 
 function sendRequest() {

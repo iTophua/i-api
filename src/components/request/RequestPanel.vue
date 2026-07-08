@@ -11,13 +11,14 @@ import {
   useMessage,
   NProgress,
 } from 'naive-ui'
-import { ChevronDownOutline, StopOutline } from '@vicons/ionicons5'
+import { ChevronDownOutline, StopOutline, CopyOutline } from '@vicons/ionicons5'
 import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useSettingsStore } from '@/stores'
 import { invoke } from '@tauri-apps/api/core'
 import { useRequestStore, useEnvironmentStore, useHistoryStore } from '@/stores'
 import { useI18n } from '@/composables/useI18n'
 import { useUrlAutocomplete } from '@/composables/useUrlAutocomplete'
+import { generateCode } from '@/utils/codeGenerator'
 import ParamsEditor from './ParamsEditor.vue'
 import HeadersEditor from './HeadersEditor.vue'
 import BodyEditor from './BodyEditor.vue'
@@ -46,6 +47,13 @@ const {
 const currentTab = ref('params')
 const showSaveModal = ref(false)
 const saveMode = ref<'save' | 'save-as'>('save')
+
+// 复制当前请求为纯 cURL 命令（不含依赖说明等额外内容）
+function copyAsCurl() {
+  const curl = generateCode(requestStore.currentRequest, 'curl', { includeDependencies: false })
+  navigator.clipboard.writeText(curl)
+  message.success(t('request.copyAsCurl'))
+}
 
 const methodOptions = [
   { label: 'GET', value: 'GET' },
@@ -548,6 +556,14 @@ onUnmounted(() => {
 
     <div class="request-tabs-container">
       <NTabs v-model:value="currentTab" type="line" role="tablist" aria-label="请求选项卡">
+        <template #suffix>
+          <NButton text size="small" class="copy-curl-btn" @click="copyAsCurl">
+            <template #icon>
+              <NIcon :component="CopyOutline" />
+            </template>
+            {{ t('request.copyAsCurl') }}
+          </NButton>
+        </template>
         <NTabPane name="params" display-directive="show">
           <template #tab>
             <span class="tab-with-badge">
@@ -859,6 +875,12 @@ onUnmounted(() => {
   padding: 0 8px;
   background: var(--n-color-modal);
   border-bottom: 1px solid var(--n-border-color);
+}
+
+.request-tabs-container .copy-curl-btn {
+  margin-right: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .request-tabs-container :deep(.n-tabs-tab) {

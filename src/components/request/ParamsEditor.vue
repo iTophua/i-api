@@ -100,8 +100,8 @@ const columns: DataTableColumns<KeyValuePair> = [
       size="small"
       :row-key="(row: KeyValuePair) => row.id || ''"
     />
-    <div class="add-row" @click="addRow">
-      <NButton text type="primary" size="small">
+    <div class="add-row">
+      <NButton text type="primary" size="small" @click="addRow">
         <template #icon>
           <NIcon :component="AddOutline" />
         </template>
@@ -160,11 +160,6 @@ const columns: DataTableColumns<KeyValuePair> = [
 
 .add-row {
   padding: 6px 0;
-  cursor: pointer;
   flex-shrink: 0;
-}
-
-.add-row:hover {
-  background-color: var(--n-color-hover);
 }
 </style>

@@ -21,11 +21,13 @@ const showDropdown = ref(false)
 const highlightedIndex = ref(-1)
 const inputRef = ref<InstanceType<typeof NInput> | null>(null)
 const wrapperRef = ref<HTMLElement | null>(null)
+const mirrorRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref({ top: 0, left: 0, width: 0 })
 const isMouseInDropdown = ref(false)
 
 watch(() => props.value, (newVal) => {
   inputValue.value = newVal
+  nextTick(syncMirrorScroll)
 })
 
 const openBrace = '\u007B\u007B'
@@ -205,6 +207,7 @@ function handleInput(value: string) {
   }
 
   emit('update:value', value)
+  nextTick(syncMirrorScroll)
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -334,12 +337,44 @@ function handleScroll() {
   }
 }
 
+// 同步镜像层与原生 input 的横向滚动位置
+// 原生 input 文字被设为透明，超长内容靠镜像层展示，
+// 因此镜像层必须跟随 input 的 scrollLeft 才能正确显示可见区域
+function syncMirrorScroll() {
+  const inputEl = inputRef.value?.inputElRef as HTMLInputElement | undefined
+  if (inputEl && mirrorRef.value) {
+    mirrorRef.value.scrollLeft = inputEl.scrollLeft
+  }
+}
+
+// scroll 事件不会冒泡，必须在原生 <input> 元素上直接绑定监听器
+let nativeInputEl: HTMLInputElement | null = null
+function bindNativeInput() {
+  const el = inputRef.value?.inputElRef as HTMLInputElement | undefined
+  if (el && el !== nativeInputEl) {
+    if (nativeInputEl) {
+      nativeInputEl.removeEventListener('scroll', syncMirrorScroll)
+    }
+    nativeInputEl = el
+    el.addEventListener('scroll', syncMirrorScroll, { passive: true })
+  }
+}
+
+watch(() => inputRef.value?.inputElRef, () => {
+  nextTick(bindNativeInput)
+})
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll, true)
+  nextTick(bindNativeInput)
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll, true)
+  if (nativeInputEl) {
+    nativeInputEl.removeEventListener('scroll', syncMirrorScroll)
+    nativeInputEl = null
+  }
 })
 </script>
 
@@ -347,7 +382,12 @@ onUnmounted(() => {
   <NTooltip :disabled="!tooltipText" :show-arrow="false">
     <template #trigger>
       <div ref="wrapperRef" class="variable-input-wrapper">
-        <div class="input-mirror" aria-hidden="true" v-html="highlightedHtml || (placeholder ? `<span class='mirror-placeholder'>${escapeHtml(placeholder)}</span>` : '')"></div>
+        <div
+          ref="mirrorRef"
+          class="input-mirror"
+          aria-hidden="true"
+          v-html="highlightedHtml || (placeholder ? `<span class='mirror-placeholder'>${escapeHtml(placeholder)}</span>` : '')"
+        ></div>
         <NInput
           ref="inputRef"
           :value="inputValue"
@@ -414,8 +454,8 @@ onUnmounted(() => {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 28px;
   padding: 0 9.5px;
   font-size: 14px;
   line-height: 28px;
@@ -423,7 +463,14 @@ onUnmounted(() => {
   pointer-events: none;
   white-space: pre;
   z-index: 1;
-  overflow: hidden;
+  /* 允许横向滚动以显示超长内容，纵向隐藏避免撑高 */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 隐藏镜像层的滚动条（靠原生 input 的滚动条即可） */
+.input-mirror::-webkit-scrollbar {
+  display: none;
 }
 
 .input-mirror :deep(.var-chip) {
