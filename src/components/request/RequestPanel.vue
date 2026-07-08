@@ -188,9 +188,10 @@ async function sendRequest(download = false) {
     }
 
     // 脚本执行后回传的测试结果 → 转换格式写入当前标签页，供 Tests 面板渲染
-    if (requestStore.activeTabId && response.testResults && response.testResults.length > 0) {
+    const currentTab = requestStore.currentTab
+    if (currentTab && response.testResults && response.testResults.length > 0) {
       const results = response.testResults
-      requestStore.currentTab.testResults = {
+      currentTab.testResults = {
         total: results.length,
         passed: results.filter((r) => r.passed).length,
         failed: results.filter((r) => !r.passed).length,
@@ -200,9 +201,9 @@ async function sendRequest(download = false) {
           message: r.error || undefined,
         })),
       }
-    } else if (requestStore.activeTabId) {
+    } else if (currentTab) {
       // 无测试结果时清空，避免显示上一次的旧结果
-      requestStore.currentTab.testResults = undefined
+      currentTab.testResults = undefined
     }
 
     historyStore.addHistory({
