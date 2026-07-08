@@ -17,6 +17,11 @@ export const useEnvironmentStore = defineStore('environment', () => {
   const managerEnvironmentId = ref<string>('default')
   const isLoaded = ref(false)
 
+  // 运行时变量（会话级临时变量，不持久化）
+  // 由脚本（pre/post）执行后回传，优先级高于环境变量，用于实现跨请求的变量传递
+  // 例如：登录请求的 post 脚本提取 token → 下一个请求的 url 中 {{token}} 自动替换
+  const runtimeVariables = ref<Record<string, string>>({})
+
   const currentEnvironment = computed(() => {
     const env = environments.value.find((e: Environment) => e.id === currentEnvironmentId.value)
     if (env) return env
@@ -33,11 +38,14 @@ export const useEnvironmentStore = defineStore('environment', () => {
 
   const variables = computed(() => {
     const vars: Record<string, string> = {}
+    // 环境变量（持久化）
     currentEnvironment.value?.variables
       .filter((v: Variable) => v.enabled)
       .forEach((v: Variable) => {
         vars[v.key] = v.value
       })
+    // 运行时变量覆盖同名环境变量（脚本设置的变量优先级更高）
+    Object.assign(vars, runtimeVariables.value)
     return vars
   })
 
@@ -313,6 +321,15 @@ export const useEnvironmentStore = defineStore('environment', () => {
     updateEnvironment(env.id, { variables: env.variables })
   }
 
+  // 批量写入运行时变量（供脚本执行后回传变量调用）
+  function setRuntimeVariables(vars: Record<string, string>): void {
+    runtimeVariables.value = { ...runtimeVariables.value, ...vars }
+  }
+
+  function clearRuntimeVariables(): void {
+    runtimeVariables.value = {}
+  }
+
   async function loadEnvironments() {
     if (isLoaded.value) return
 
@@ -390,6 +407,8 @@ export const useEnvironmentStore = defineStore('environment', () => {
     replaceVariables,
     getVariable,
     setVariable,
+    setRuntimeVariables,
+    clearRuntimeVariables,
     loadEnvironments,
   }
 })

@@ -182,6 +182,8 @@ async fn send_request_internal(
                 body_bytes,
                 response_time,
                 response_size,
+                test_results: None,
+                script_variables: None,
             })
         }
         _ = cancellation_token.cancelled() => {

@@ -78,8 +78,8 @@ enum ResponseExpression {
 #[derive(Clone, Debug)]
 enum Assertion {
     StatusEquals(u16),
-    StatusBelow(u64),
-    StatusAbove(u64),
+    TimeBelow(u64),
+    TimeAbove(u64),
     HasBody,
     HasHeader(String),
     JsonPath { path: String, expected: String },
@@ -96,16 +96,14 @@ pub fn execute_pre_request_script(
         return Ok(context);
     }
 
-    // 尝试从缓存获取编译后的脚本
-    let compiled = compile_script(script);
-
     // 环境变量替换
     let mut processed_script = script.to_string();
     for (key, value) in environment {
         processed_script = processed_script.replace(&format!("{{{{{}}}}}", key), value);
     }
 
-    // 执行预请求脚本
+    // 编译（带缓存）并执行替换后的脚本
+    let compiled = compile_script(&processed_script);
     execute_tokens(&compiled.tokens, request, None, &mut context);
 
     Ok(context)
@@ -251,31 +249,21 @@ fn parse_script(script: &str) -> Vec<Token> {
 
     // 解析 pm.response.json()
     if let Some(json_pos) = script.find("pm.response.json()") {
-        let var_match = script[..json_pos].rfind(|c: char| !c.is_whitespace());
-        if let Some(var_pos) = var_match {
-            let before = &script[..=var_pos];
-            if let Some(eq_pos) = before.rfind('=') {
-                let var_name = script[eq_pos + 1..var_pos + 1].trim().to_string();
-                tokens.push(Token::ResponseGet {
-                    var_name,
-                    expression: ResponseExpression::Json,
-                });
-            }
+        if let Some(var_name) = extract_var_name_before(script, json_pos) {
+            tokens.push(Token::ResponseGet {
+                var_name,
+                expression: ResponseExpression::Json,
+            });
         }
     }
 
     // 解析 pm.response.text()
     if let Some(text_pos) = script.find("pm.response.text()") {
-        let var_match = script[..text_pos].rfind(|c: char| !c.is_whitespace());
-        if let Some(var_pos) = var_match {
-            let before = &script[..=var_pos];
-            if let Some(eq_pos) = before.rfind('=') {
-                let var_name = script[eq_pos + 1..var_pos + 1].trim().to_string();
-                tokens.push(Token::ResponseGet {
-                    var_name,
-                    expression: ResponseExpression::Text,
-                });
-            }
+        if let Some(var_name) = extract_var_name_before(script, text_pos) {
+            tokens.push(Token::ResponseGet {
+                var_name,
+                expression: ResponseExpression::Text,
+            });
         }
     }
 
@@ -292,16 +280,11 @@ fn parse_script(script: &str) -> Vec<Token> {
                 .to_string();
 
             let full_pos = header_pos + start;
-            let var_match = script[..full_pos].rfind(|c: char| !c.is_whitespace());
-            if let Some(var_pos) = var_match {
-                let before = &script[..=var_pos];
-                if let Some(eq_pos) = before.rfind('=') {
-                    let var_name = script[eq_pos + 1..var_pos + 1].trim().to_string();
-                    tokens.push(Token::ResponseGet {
-                        var_name,
-                        expression: ResponseExpression::Header(header_name),
-                    });
-                }
+            if let Some(var_name) = extract_var_name_before(script, full_pos) {
+                tokens.push(Token::ResponseGet {
+                    var_name,
+                    expression: ResponseExpression::Header(header_name),
+                });
             }
 
             header_pos = get_start + end + 1;
@@ -345,6 +328,24 @@ fn parse_script(script: &str) -> Vec<Token> {
     }
 
     tokens
+}
+
+/// 从表达式的起始位置往前找赋值语句，提取变量名
+/// 例如 "const token = pm.response.json()" 中 expr_pos 指向 "pm"，返回 Some("token")
+fn extract_var_name_before(script: &str, expr_pos: usize) -> Option<String> {
+    let before = &script[..expr_pos];
+    let eq_pos = before.rfind('=')?;
+    // 确认是赋值（排除 ==、>=、<=、!= 等比较运算符）
+    let before_eq = &script[..eq_pos];
+    if before_eq.ends_with('=') || before_eq.ends_with('>') || before_eq.ends_with('<') || before_eq.ends_with('!') {
+        return None;
+    }
+    let var_name = script[eq_pos + 1..expr_pos].trim().to_string();
+    // 变量名必须合法：不含空格、运算符、点
+    if var_name.is_empty() || var_name.contains('.') || var_name.contains(char::is_whitespace) {
+        return None;
+    }
+    Some(var_name)
 }
 
 /// 查找匹配的右括号
@@ -497,7 +498,7 @@ fn parse_assertion(script: &str) -> Assertion {
             let start = below_start + "to.be.below(".len();
             if let Some(end) = script[start..].find(')') {
                 if let Ok(threshold) = script[start..start + end].parse::<u64>() {
-                    return Assertion::StatusBelow(threshold);
+                    return Assertion::TimeBelow(threshold);
                 }
             }
         }
@@ -508,7 +509,7 @@ fn parse_assertion(script: &str) -> Assertion {
             let start = above_start + "to.be.above(".len();
             if let Some(end) = script[start..].find(')') {
                 if let Ok(threshold) = script[start..start + end].parse::<u64>() {
-                    return Assertion::StatusAbove(threshold);
+                    return Assertion::TimeAbove(threshold);
                 }
             }
         }
@@ -617,8 +618,8 @@ fn evaluate_assertion(
 
     match assertion {
         Assertion::StatusEquals(expected) => response.status == *expected,
-        Assertion::StatusBelow(threshold) => response.response_time < *threshold,
-        Assertion::StatusAbove(threshold) => response.response_time > *threshold,
+        Assertion::TimeBelow(threshold) => response.response_time < *threshold,
+        Assertion::TimeAbove(threshold) => response.response_time > *threshold,
         Assertion::HasBody => !response.body.is_empty(),
         Assertion::HasHeader(header) => response.headers.contains_key(header),
         Assertion::JsonPath { path, expected } => {

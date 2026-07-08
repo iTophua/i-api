@@ -35,32 +35,20 @@ const preRequestSnippets = [
     code: 'pm.environment.set("variableName", "variableValue");',
   },
   {
-    name: '获取环境变量',
-    code: 'const value = pm.environment.get("variableName");\nconsole.log("变量值:", value);',
+    name: '修改请求 URL',
+    code: 'pm.request.url = "https://api.example.com/new-endpoint";',
   },
   {
-    name: '设置请求头',
-    code: 'pm.request.headers.add({\n  key: "Header-Name",\n  value: "Header-Value"\n});',
+    name: '修改请求方法',
+    code: 'pm.request.method = "POST";',
   },
   {
-    name: '设置 URL 参数',
-    code: 'pm.request.url.query.add({\n  key: "paramName",\n  value: "paramValue"\n});',
+    name: '使用动态变量',
+    code: '// 通过 {{动态变量}} 语法在值中嵌入动态值，引擎会自动替换\npm.environment.set("requestId", "{{$randomUUID}}");\npm.environment.set("timestamp", "{{$timestamp}}");',
   },
   {
-    name: '生成时间戳',
-    code: 'const timestamp = Date.now();\npm.environment.set("timestamp", timestamp);',
-  },
-  {
-    name: '生成随机字符串',
-    code: 'const randomStr = Math.random().toString(36).substring(7);\npm.environment.set("randomStr", randomStr);',
-  },
-  {
-    name: '生成 UUID',
-    code: 'const uuid = crypto.randomUUID();\npm.environment.set("uuid", uuid);',
-  },
-  {
-    name: 'Base64 编码',
-    code: 'const encoded = btoa("Hello World");\npm.environment.set("encoded", encoded);',
+    name: '设置多个变量',
+    code: 'pm.environment.set("baseUrl", "https://api.example.com");\npm.environment.set("apiKey", "your-api-key");',
   },
 ]
 
@@ -71,31 +59,31 @@ const testSnippets = [
   },
   {
     name: '断言响应时间',
-    code: 'pm.test("响应时间小于 500ms", () => {\n  pm.expect(pm.response.responseTime).to.be.below(500);\n});',
+    code: 'pm.test("响应时间小于 500ms", () => {\n  pm.expect(pm.response.time).to.be.below(500);\n});',
   },
   {
-    name: '获取响应状态码',
-    code: 'const status = pm.response.status;\nconsole.log("状态码:", status);',
+    name: '断言响应头存在',
+    code: 'pm.test("Content-Type 存在", () => {\n  pm.response.to.have.header("Content-Type");\n});',
   },
   {
-    name: '提取 JSON 字段',
-    code: 'const json = JSON.parse(pm.response.body);\nconst value = json.data.key;\npm.environment.set("extractedValue", value);',
+    name: '提取响应 JSON',
+    code: '// 将整个响应体解析为 JSON 存入变量，后续请求可通过 {{responseData}} 使用\nconst responseData = pm.response.json();',
   },
   {
-    name: '断言 JSON 字段',
-    code: 'const json = JSON.parse(pm.response.body);\npm.test("字段存在", () => {\n  pm.expect(json.data).to.have.property("key");\n});',
+    name: '提取响应文本',
+    code: '// 后续请求可通过 {{responseText}} 使用\nconst responseText = pm.response.text();',
   },
   {
-    name: '断言响应包含文本',
-    code: 'pm.test("响应包含预期文本", () => {\n  pm.expect(pm.response.body).to.include("expectedText");\n});',
+    name: '提取响应头',
+    code: '// 后续请求可通过 {{contentType}} 使用\nconst contentType = pm.response.headers.get("Content-Type");',
   },
   {
-    name: '断言数组长度',
-    code: 'const json = JSON.parse(pm.response.body);\npm.test("数组长度正确", () => {\n  pm.expect(json.data).to.be.an("array");\n  pm.expect(json.data).to.have.lengthOf(10);\n});',
+    name: '提取状态码',
+    code: '// 后续请求可通过 {{responseStatus}} 使用\nconst responseStatus = pm.response.status;',
   },
   {
-    name: '设置下次请求变量',
-    code: 'const json = JSON.parse(pm.response.body);\npm.environment.set("nextRequestId", json.data.id);',
+    name: '提取 Token（链式传递）',
+    code: '// 从响应中提取 token，变量名即为 token，后续请求可通过 {{token}} 使用\nconst token = pm.response.json();',
   },
 ]
 

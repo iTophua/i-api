@@ -143,6 +143,12 @@ pub struct HttpResponse {
     pub body_bytes: Option<Vec<u8>>,
     pub response_time: u64,
     pub response_size: usize,
+    /// 脚本执行产生的测试结果（post 脚本的断言）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_results: Option<Vec<crate::script::TestResult>>,
+    /// 脚本执行产生的变量（pre/post 脚本设置/提取的变量，回传给前端供后续请求使用）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script_variables: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

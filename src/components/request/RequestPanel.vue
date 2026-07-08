@@ -174,11 +174,36 @@ async function sendRequest(download = false) {
 
     const response = await invoke<Response>('send_http_request', {
       request,
+      // 传入当前环境变量（含运行时变量），供后端脚本内的 {{var}} 替换使用
+      environment: environmentStore.variables,
       historyLimit: settingsStore.settings?.historyLimit ?? 100,
     })
 
     requestStore.setUploadProgress(100)
     requestStore.setDownloadProgress(100)
+
+    // 脚本执行后回传的变量 → 写入运行时变量层，供后续请求使用
+    if (response.scriptVariables && Object.keys(response.scriptVariables).length > 0) {
+      environmentStore.setRuntimeVariables(response.scriptVariables)
+    }
+
+    // 脚本执行后回传的测试结果 → 转换格式写入当前标签页，供 Tests 面板渲染
+    if (requestStore.activeTabId && response.testResults && response.testResults.length > 0) {
+      const results = response.testResults
+      requestStore.currentTab.testResults = {
+        total: results.length,
+        passed: results.filter((r) => r.passed).length,
+        failed: results.filter((r) => !r.passed).length,
+        assertions: results.map((r) => ({
+          name: r.name,
+          passed: r.passed,
+          message: r.error || undefined,
+        })),
+      }
+    } else if (requestStore.activeTabId) {
+      // 无测试结果时清空，避免显示上一次的旧结果
+      requestStore.currentTab.testResults = undefined
+    }
 
     historyStore.addHistory({
       requestId: requestStore.currentRequest.id,

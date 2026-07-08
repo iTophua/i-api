@@ -163,6 +163,18 @@ export interface Response {
   bodyBytes?: number[]
   responseTime: number
   responseSize: number
+  /** 脚本执行产生的测试结果 */
+  testResults?: ScriptTestResult[]
+  /** 脚本执行产生的变量（回传给前端，供后续请求使用） */
+  scriptVariables?: Record<string, string>
+}
+
+/** 后端脚本执行返回的单条测试结果 */
+export interface ScriptTestResult {
+  name: string
+  passed: boolean
+  error?: string | null
+  durationMs?: number | null
 }
 
 export interface ShortcutBinding {

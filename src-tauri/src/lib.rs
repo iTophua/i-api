@@ -85,12 +85,58 @@ pub fn run() {
 
 #[tauri::command]
 async fn send_http_request(
-    request: HttpRequest,
+    mut request: HttpRequest,
+    environment: Option<std::collections::HashMap<String, String>>,
     history_limit: Option<i64>,
     db: tauri::State<'_, Arc<Database>>,
 ) -> Result<HttpResponse, String> {
-    let response = http::send_request(request.clone()).await?;
+    let env = environment.unwrap_or_default();
+    let mut all_script_variables = std::collections::HashMap::new();
 
+    // 1. 执行前置脚本（可能修改 request.url / request.method，并产生变量）
+    let pre_script = request.pre_script.clone();
+    if let Some(pre_script) = &pre_script {
+        if !pre_script.trim().is_empty() {
+            match script::execute_pre_request_script(pre_script, &mut request, &env) {
+                Ok(ctx) => {
+                    all_script_variables.extend(ctx.variables);
+                }
+                Err(e) => {
+                    eprintln!("前置脚本执行失败: {}", e);
+                }
+            }
+        }
+    }
+
+    // 2. 发送 HTTP 请求（使用脚本可能修改过的 request）
+    let mut response = http::send_request(request.clone()).await?;
+
+    // 3. 执行后置脚本（断言 + 变量提取）
+    let post_script = request.post_script.clone();
+    if let Some(post_script) = &post_script {
+        if !post_script.trim().is_empty() {
+            match script::execute_post_request_script(post_script, &request, &response, &env) {
+                Ok(ctx) => {
+                    // 回传测试结果
+                    if !ctx.test_results.is_empty() {
+                        response.test_results = Some(ctx.test_results);
+                    }
+                    // 合并 post 脚本产生的变量
+                    all_script_variables.extend(ctx.variables);
+                }
+                Err(e) => {
+                    eprintln!("后置脚本执行失败: {}", e);
+                }
+            }
+        }
+    }
+
+    // 4. 回传脚本产生的变量（供前端写入 runtimeVariables，实现跨请求传递）
+    if !all_script_variables.is_empty() {
+        response.script_variables = Some(all_script_variables);
+    }
+
+    // 5. 保存历史（用脚本修改后的 request，反映实际发送内容）
     let history = History::with_request_data(
         request.method,
         request.url,
