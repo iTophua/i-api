@@ -87,6 +87,10 @@ export interface Request {
   proxy?: ProxyConfig
   followRedirects?: boolean
   verifySsl?: boolean
+  /** 所属集合 ID（后端序列化携带，用于归位） */
+  collectionId?: string
+  /** 所属文件夹 ID（为空表示直接挂在集合根部） */
+  folderId?: string
   createdAt: string
   updatedAt: string
 }
@@ -105,6 +109,10 @@ export interface Folder {
   description?: string
   folders: Folder[]
   requests: Request[]
+  /** 所属集合 ID */
+  collectionId?: string
+  /** 父文件夹 ID（为空表示挂在集合根部） */
+  parentFolderId?: string
   createdAt: string
   updatedAt: string
 }

@@ -10,7 +10,7 @@ mod script;
 mod secure_storage;
 
 use database::Database;
-use models::{AppState, Collection, Environment, History, HttpRequest, HttpResponse};
+use models::{AppState, Collection, Environment, Folder, History, HttpRequest, HttpResponse};
 use script::{execute_post_request_script, execute_pre_request_script, ScriptContext};
 use secure_storage::SecureStorage;
 use std::sync::Arc;
@@ -71,6 +71,9 @@ pub fn run() {
             get_all_collections,
             delete_collection,
             rename_collection,
+            save_folder,
+            get_all_folders,
+            delete_folder,
             save_request_to_collection,
             get_requests_by_collection,
             rename_request,
@@ -564,6 +567,52 @@ fn rename_collection(
     db.repository
         .rename_collection(&id, &name, &now)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_folder(folder: Folder, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
+    db.repository
+        .save_folder(&folder)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_all_folders(db: tauri::State<'_, Arc<Database>>) -> Result<Vec<Folder>, String> {
+    db.repository
+        .get_all_folders()
+        .map_err(|e| e.to_string())
+}
+
+/// 递归删除文件夹：先删该 folder 下所有 requests，再递归删子 folders，最后删自身
+/// 避免 parent_folder_id 自引用外键约束报错
+#[tauri::command]
+fn delete_folder(id: String, db: tauri::State<'_, Arc<Database>>) -> Result<(), String> {
+    let all_folders = db.repository.get_all_folders().map_err(|e| e.to_string())?;
+
+    // 收集要删除的 folder id（自身 + 所有后代）
+    let mut to_delete: Vec<String> = vec![id.clone()];
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for f in &all_folders {
+            if let Some(pid) = &f.parent_folder_id {
+                if to_delete.contains(pid) && !to_delete.contains(&f.id) {
+                    to_delete.push(f.id.clone());
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    // 先删除这些 folder 下所有 requests（folder_id 匹配）
+    for fid in &to_delete {
+        let _ = db.repository.delete_requests_by_folder(fid);
+    }
+    // 再删除 folder 记录自身（子 folder 先删，父 folder 后删，满足自引用外键约束）
+    for fid in to_delete.iter().rev() {
+        db.repository.delete_folder(fid).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

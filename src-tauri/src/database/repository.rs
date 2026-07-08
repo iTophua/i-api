@@ -399,6 +399,13 @@ impl DatabaseRepository {
         Ok(())
     }
 
+    /// 删除指定文件夹下的所有请求（不递归子文件夹）
+    pub fn delete_requests_by_folder(&self, folder_id: &str) -> SqliteResult<()> {
+        let conn = self.get_conn()?;
+        conn.execute("DELETE FROM requests WHERE folder_id = ?", [folder_id])?;
+        Ok(())
+    }
+
     // ==================== Environment 操作 ====================
 
     pub fn save_environment(&self, env: &Environment) -> SqliteResult<()> {

@@ -348,6 +348,10 @@ export const useRequestStore = defineStore('request', () => {
     request.name = request.name || '未命名请求'
 
     try {
+      // 同步 request 的归属字段，保证内存与 DB 一致
+      request.collectionId = collectionId
+      request.folderId = folderId || undefined
+
       await invoke('save_request_to_collection', {
         request,
         collectionId,
@@ -425,40 +429,88 @@ export const useRequestStore = defineStore('request', () => {
     }
   }
 
-  function createFolder(
+  async function createFolder(
     collectionId: string,
     name: string,
     parentFolderId?: string
-  ): Folder | null {
+  ): Promise<Folder | null> {
     const collection = collections.value.find((c: Collection) => c.id === collectionId)
     if (!collection) return null
 
+    const now = new Date().toISOString()
     const folder: Folder = {
       id: crypto.randomUUID(),
       name,
       folders: [],
       requests: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      collectionId,
+      parentFolderId: parentFolderId || undefined,
+      createdAt: now,
+      updatedAt: now,
     }
 
+    // 组装到内存树
     if (parentFolderId) {
-      const addToParent = (folders: Folder[]): boolean => {
-        for (const f of folders) {
-          if (f.id === parentFolderId) {
-            f.folders.push(folder)
-            return true
-          }
-          if (addToParent(f.folders)) return true
-        }
-        return false
+      const parent = findFolderRecursive(collection.folders, parentFolderId)
+      if (parent) {
+        parent.folders.push(folder)
+      } else {
+        // 父文件夹找不到时回退到集合根部
+        collection.folders.push(folder)
+        folder.parentFolderId = undefined
       }
-      addToParent(collection.folders)
     } else {
       collection.folders.push(folder)
     }
 
+    // 持久化到后端
+    try {
+      await invoke('save_folder', { folder })
+    } catch (e) {
+      console.error('创建文件夹失败:', e)
+    }
+
     return folder
+  }
+
+  async function deleteFolder(collectionId: string, folderId: string) {
+    const collection = collections.value.find((c: Collection) => c.id === collectionId)
+    if (!collection) return
+
+    // 递归从内存树移除
+    const removeFromTree = (folders: Folder[]): boolean => {
+      const idx = folders.findIndex((f) => f.id === folderId)
+      if (idx >= 0) {
+        folders.splice(idx, 1)
+        return true
+      }
+      return folders.some((f) => removeFromTree(f.folders))
+    }
+    removeFromTree(collection.folders)
+
+    // 持久化（后端会递归删子文件夹及其 requests）
+    try {
+      await invoke('delete_folder', { id: folderId })
+    } catch (e) {
+      console.error('删除文件夹失败:', e)
+    }
+  }
+
+  async function renameFolder(collectionId: string, folderId: string, newName: string) {
+    const collection = collections.value.find((c: Collection) => c.id === collectionId)
+    if (!collection) return
+
+    const folder = findFolderRecursive(collection.folders, folderId)
+    if (!folder) return
+
+    folder.name = newName
+    folder.updatedAt = new Date().toISOString()
+
+    try {
+      await invoke('save_folder', { folder })
+    } catch (e) {
+      console.error('重命名文件夹失败:', e)
+    }
   }
 
   async function deleteRequest(collectionId: string, requestId: string) {
@@ -537,24 +589,88 @@ export const useRequestStore = defineStore('request', () => {
     }
   }
 
+  /**
+   * 将扁平 folder 列表组装成嵌套树（按 parent_folder_id）
+   * 只组装属于指定 collection 的 folders
+   */
+  function buildFolderTree(flatFolders: Folder[], collectionId: string): Folder[] {
+    const collectionFolders = flatFolders.filter((f) => f.collectionId === collectionId)
+    const folderMap = new Map<string, Folder>()
+    const roots: Folder[] = []
+
+    // 初始化每个 folder 的 folders/requests 子数组
+    for (const f of collectionFolders) {
+      folderMap.set(f.id, {
+        ...f,
+        folders: [],
+        requests: [],
+      })
+    }
+
+    // 按 parentFolderId 挂载
+    for (const f of collectionFolders) {
+      const node = folderMap.get(f.id)!
+      if (f.parentFolderId && folderMap.has(f.parentFolderId)) {
+        folderMap.get(f.parentFolderId)!.folders.push(node)
+      } else {
+        roots.push(node)
+      }
+    }
+
+    return roots
+  }
+
+  /**
+   * 递归在 folders 树中查找指定 id 的 folder
+   */
+  function findFolderRecursive(folders: Folder[], folderId: string): Folder | null {
+    for (const f of folders) {
+      if (f.id === folderId) return f
+      const found = findFolderRecursive(f.folders, folderId)
+      if (found) return found
+    }
+    return null
+  }
+
   async function loadCollections() {
     try {
       const loadedCollections = await invoke<Collection[]>('get_all_collections')
       if (loadedCollections) {
+        // 加载所有 folders（扁平列表，含 collectionId/parentFolderId）
+        const allFolders = await invoke<Folder[]>('get_all_folders').catch(() => [])
+
         for (const collection of loadedCollections) {
           // 确保时间字段有效
           collection.createdAt = safeParseDate(collection.createdAt)
           collection.updatedAt = safeParseDate(collection.updatedAt)
 
+          // 组装 folder 嵌套树
+          collection.folders = buildFolderTree(allFolders, collection.id)
+
+          // 加载该集合下所有 requests（含 folderId），按 folderId 归位
           const requests = await invoke<Request[]>('get_requests_by_collection', {
             collectionId: collection.id,
           })
-          collection.requests = (requests || []).map((request) => ({
+          const parsedRequests = (requests || []).map((request) => ({
             ...request,
             createdAt: safeParseDate(request.createdAt),
             updatedAt: safeParseDate(request.updatedAt),
           }))
-          collection.folders = []
+
+          collection.requests = []
+          for (const request of parsedRequests) {
+            if (request.folderId) {
+              const folder = findFolderRecursive(collection.folders, request.folderId)
+              if (folder) {
+                folder.requests.push(request)
+              } else {
+                // folder 找不到时回退到集合根部，避免请求丢失
+                collection.requests.push(request)
+              }
+            } else {
+              collection.requests.push(request)
+            }
+          }
         }
         collections.value = loadedCollections
       }
@@ -868,7 +984,7 @@ export const useRequestStore = defineStore('request', () => {
       requests.splice(toIndex, 0, removed)
       fromCollection.requests = requests
     } else if (fromFolderId && toFolderId && fromFolderId === toFolderId) {
-      const fromFolder = fromCollection.folders.find((f) => f.id === fromFolderId)
+      const fromFolder = findFolderRecursive(fromCollection.folders, fromFolderId)
       if (fromFolder) {
         const requests = [...fromFolder.requests]
         const [removed] = requests.splice(fromIndex, 1)
@@ -878,7 +994,7 @@ export const useRequestStore = defineStore('request', () => {
     } else {
       const getSourceRequests = (c: Collection, folderId?: string) => {
         if (folderId) {
-          const folder = c.folders.find((f) => f.id === folderId)
+          const folder = findFolderRecursive(c.folders, folderId)
           return folder?.requests || []
         }
         return c.requests
@@ -888,7 +1004,16 @@ export const useRequestStore = defineStore('request', () => {
       const targetRequests = getSourceRequests(toCollection, toFolderId)
 
       const [removed] = sourceRequests.splice(fromIndex, 1)
+      // 更新被移动 request 的 folderId
+      removed.folderId = toFolderId
       targetRequests.splice(toIndex, 0, removed)
+
+      // 持久化被移动 request 的 folderId 归属
+      invoke('save_request_to_collection', {
+        request: removed,
+        collectionId: toCollectionId,
+        folderId: toFolderId || null,
+      }).catch(console.error)
     }
 
     invoke('save_collection', { collection: fromCollection }).catch(console.error)
@@ -937,6 +1062,8 @@ export const useRequestStore = defineStore('request', () => {
     createCollection,
     renameCollection,
     createFolder,
+    deleteFolder,
+    renameFolder,
     deleteRequest,
     deleteCollection,
     reorderCollection,

@@ -14,6 +14,10 @@ interface SidebarDragState {
   currentIndex: number
   elementHeight: number
   sourceCollectionId?: string
+  /** 拖拽请求的来源文件夹（拖入文件夹功能用） */
+  sourceFolderId?: string
+  /** 拖拽过程中悬停的目标文件夹（命中时高亮） */
+  dropFolderId?: string
   mouseX: number
   mouseY: number
   sourceRect?: DOMRect
@@ -23,7 +27,15 @@ interface SidebarDragState {
 export function useSidebarDrag(
   _getCollections: () => { id: string; name: string; requests: { id: string; name: string }[] }[],
   reorderCollection: (from: number, to: number) => void,
-  reorderRequest: (collectionId: string, from: number, to: number) => void
+  reorderRequest: (collectionId: string, from: number, to: number) => void,
+  /** 拖请求移入文件夹（跨容器移动） */
+  moveRequestToFolder?: (
+    requestId: string,
+    fromCollectionId: string,
+    fromFolderId: string | undefined,
+    toCollectionId: string,
+    toFolderId: string
+  ) => void
 ) {
   const dragState = ref<SidebarDragState>({
     dragging: false,
@@ -128,7 +140,8 @@ export function useSidebarDrag(
     e: MouseEvent,
     request: { id: string; name: string; method?: HttpMethod },
     collectionId: string,
-    requestIndex: number
+    requestIndex: number,
+    sourceFolderId?: string
   ) {
     if (e.button !== 0) return
 
@@ -149,6 +162,7 @@ export function useSidebarDrag(
       currentIndex: requestIndex,
       elementHeight: rect.height,
       sourceCollectionId: collectionId,
+      sourceFolderId,
       mouseX: e.clientX,
       mouseY: e.clientY,
       sourceRect: rect,
@@ -174,10 +188,17 @@ export function useSidebarDrag(
     dragState.value.mouseX = e.clientX
     dragState.value.mouseY = e.clientY
 
+    // 检测是否悬停在文件夹节点上（用于拖入文件夹）
+    const folderEl = (e.target as HTMLElement)?.closest('.folder-drop-target') as HTMLElement | null
+    dragState.value.dropFolderId = folderEl?.dataset.folderId
+
+    // 若命中文件夹，跳过排序计算（避免误判 index）
+    if (folderEl) return
+
     const { sourceCollectionId } = dragState.value
     if (!sourceCollectionId) return
 
-    const items = document.querySelectorAll(`.request-item[data-collection-id="${sourceCollectionId}"]`)
+    const items = document.querySelectorAll(`.request-item[data-collection-id="${sourceCollectionId}"]:not([data-folder-id])`)
     if (items.length === 0) return
 
     const firstRect = items[0].getBoundingClientRect()
@@ -192,12 +213,18 @@ export function useSidebarDrag(
 
     if (!dragState.value.dragging || dragState.value.type !== 'request') return
 
-    const { dragId, sourceCollectionId, sourceIndex, currentIndex, dragStarted } = dragState.value
+    const { dragId, sourceCollectionId, sourceFolderId, sourceIndex, currentIndex, dragStarted, dropFolderId } = dragState.value
 
     if (!dragId || !sourceCollectionId) return
 
-    if (dragStarted && sourceIndex !== currentIndex) {
-      reorderRequest(sourceCollectionId, sourceIndex, currentIndex)
+    if (dragStarted) {
+      // 优先处理：拖入文件夹
+      if (dropFolderId && moveRequestToFolder && dropFolderId !== sourceFolderId) {
+        moveRequestToFolder(dragId, sourceCollectionId, sourceFolderId, sourceCollectionId, dropFolderId)
+      } else if (!dropFolderId && sourceIndex !== currentIndex) {
+        // 否则：同容器内排序
+        reorderRequest(sourceCollectionId, sourceIndex, currentIndex)
+      }
     }
 
     dragState.value = {
@@ -211,6 +238,8 @@ export function useSidebarDrag(
       currentIndex: 0,
       elementHeight: 0,
       sourceCollectionId: undefined,
+      sourceFolderId: undefined,
+      dropFolderId: undefined,
       mouseX: 0,
       mouseY: 0,
       dragStarted: false,

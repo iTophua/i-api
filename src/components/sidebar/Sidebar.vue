@@ -8,7 +8,7 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { useRequestStore, useEnvironmentStore } from '@/stores'
 import { useI18n } from '@/composables/useI18n'
 import { useSidebarDrag } from '@/composables/useSidebarDrag'
-import type { Request, HttpMethod, History as RequestHistory } from '@/types'
+import type { Request, HttpMethod, Folder, History as RequestHistory } from '@/types'
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
 
@@ -19,6 +19,7 @@ import { HttpMethodIcon, AppIcon } from '@/components/icons'
 import BatchOperationToolbar from '@/components/common/BatchOperationToolbar.vue'
 import BatchMoveDialog from '@/components/common/BatchMoveDialog.vue'
 import HistoryPanel from '@/components/history/HistoryPanel.vue'
+import FolderNode from './FolderNode.vue'
 
 defineProps<{
   collapsed?: boolean
@@ -53,7 +54,13 @@ const newCollectionName = ref('')
 const showContextMenu = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
-const contextMenuTarget = ref<{ id: string; type: 'collection' | 'request'; collectionId?: string } | null>(null)
+const contextMenuTarget = ref<{ id: string; type: 'collection' | 'request'; collectionId?: string; folderId?: string } | null>(null)
+
+// 集合级新建文件夹对话框
+const showNewFolderDialog = ref(false)
+const newFolderCollectionId = ref<string | null>(null)
+const newFolderParentId = ref<string | undefined>(undefined)
+const newFolderName = ref('')
 
 const {
   dragState,
@@ -66,13 +73,46 @@ const {
 } = useSidebarDrag(
   () => filteredCollections.value,
   (from, to) => requestStore.reorderCollection(from, to),
-  (collectionId, from, to) => requestStore.reorderRequest(collectionId, from, to)
+  (collectionId, from, to) => requestStore.reorderRequest(collectionId, from, to),
+  // 拖请求移入文件夹：算出源索引后交给 store.moveRequest（它负责移除+插入+持久化）
+  (requestId, fromCollectionId, fromFolderId, _toCollectionId, toFolderId) => {
+    const collection = requestStore.collections.find(c => c.id === fromCollectionId)
+    if (!collection) return
+
+    // 查找请求在源容器中的索引
+    const findIndex = (folders: Folder[]): number => {
+      for (const f of folders) {
+        const idx = f.requests.findIndex(r => r.id === requestId)
+        if (idx >= 0) return idx
+        const sub = findIndex(f.folders)
+        if (sub >= 0) return sub
+      }
+      return -1
+    }
+    const fromIndex = fromFolderId
+      ? findIndex(collection.folders)
+      : collection.requests.findIndex(r => r.id === requestId)
+
+    if (fromIndex < 0) return
+
+    // toIndex 用一个足够大的值，让 moveRequest 插到目标容器末尾
+    requestStore.moveRequest(
+      requestId,
+      fromCollectionId,
+      fromCollectionId,
+      fromIndex,
+      Number.MAX_SAFE_INTEGER,
+      fromFolderId,
+      toFolderId
+    )
+  }
 )
 
-const collectionContextMenuOptions = [
-  { label: '重命名', key: 'rename' },
-  { label: '删除', key: 'delete' },
-]
+const collectionContextMenuOptions = computed(() => [
+  { label: () => t('collection.newFolder'), key: 'new-folder' },
+  { label: () => t('common.rename'), key: 'rename' },
+  { label: () => t('common.delete'), key: 'delete' },
+])
 
 const requestContextMenuOptions = [
   { label: '重命名', key: 'rename' },
@@ -95,11 +135,23 @@ function handleRequestContextMenu(e: MouseEvent, request: { id: string; name: st
   showContextMenu.value = true
 }
 
+/** 文件夹内 request 的右键（带 folderId，用于重命名时定位） */
+function handleFolderRequestContextMenu(e: MouseEvent, request: { id: string; name: string }, collectionId: string, folderId: string) {
+  e.preventDefault()
+  e.stopPropagation()
+  contextMenuTarget.value = { id: request.id, type: 'request', collectionId, folderId }
+  contextMenuX.value = e.clientX
+  contextMenuY.value = e.clientY
+  showContextMenu.value = true
+}
+
 function handleContextMenuSelect(key: string) {
   if (!contextMenuTarget.value) return
 
   if (contextMenuTarget.value.type === 'collection') {
-    if (key === 'rename') {
+    if (key === 'new-folder') {
+      openNewFolderDialog(contextMenuTarget.value.id)
+    } else if (key === 'rename') {
       const collection = requestStore.collections.find(c => c.id === contextMenuTarget.value!.id)
       if (collection) {
         startRename(collection.id, collection.name, 'collection')
@@ -109,10 +161,12 @@ function handleContextMenuSelect(key: string) {
     }
   } else if (contextMenuTarget.value.type === 'request' && contextMenuTarget.value.collectionId) {
     if (key === 'rename') {
-      const collection = requestStore.collections.find(c => c.id === contextMenuTarget.value!.collectionId)
-      const request = collection?.requests.find(r => r.id === contextMenuTarget.value!.id)
-      if (request) {
-        startRename(request.id, request.name, 'request')
+      // 请求可能在 folder 内或集合根部，重命名都走 store.renameRequest
+      startRename(contextMenuTarget.value.id, '', 'request')
+      // 找到实际 request 名字回填
+      const found = findRequestInCollection(contextMenuTarget.value.collectionId, contextMenuTarget.value.id, contextMenuTarget.value.folderId)
+      if (found) {
+        editingName.value = found.name
       }
     } else if (key === 'delete') {
       requestStore.deleteRequest(contextMenuTarget.value.collectionId, contextMenuTarget.value.id)
@@ -121,6 +175,55 @@ function handleContextMenuSelect(key: string) {
 
   showContextMenu.value = false
   contextMenuTarget.value = null
+}
+
+/** 在集合（含文件夹）中递归查找 request */
+function findRequestInCollection(collectionId: string, requestId: string, _folderId?: string): Request | undefined {
+  const collection = requestStore.collections.find(c => c.id === collectionId)
+  if (!collection) return undefined
+  const findInFolders = (folders: Folder[]): Request | undefined => {
+    for (const f of folders) {
+      const r = f.requests.find(rq => rq.id === requestId)
+      if (r) return r
+      const sub = findInFolders(f.folders)
+      if (sub) return sub
+    }
+    return undefined
+  }
+  return collection.requests.find(r => r.id === requestId) || findInFolders(collection.folders)
+}
+
+/** 打开新建文件夹对话框 */
+function openNewFolderDialog(collectionId: string, parentFolderId?: string) {
+  newFolderCollectionId.value = collectionId
+  newFolderParentId.value = parentFolderId
+  newFolderName.value = t('collection.newFolder')
+  showNewFolderDialog.value = true
+}
+
+async function confirmNewFolder() {
+  const name = newFolderName.value.trim()
+  if (name && newFolderCollectionId.value) {
+    const folder = await requestStore.createFolder(newFolderCollectionId.value, name, newFolderParentId.value)
+    // 创建后展开所属的父节点（集合或父文件夹），以便看到新建的文件夹
+    if (folder) {
+      const expandKey = newFolderParentId.value ? `folder:${newFolderParentId.value}` : newFolderCollectionId.value
+      if (!expandedKeys.value.has(expandKey)) {
+        expandedKeys.value.add(expandKey)
+      }
+    }
+  }
+  showNewFolderDialog.value = false
+  newFolderCollectionId.value = null
+  newFolderParentId.value = undefined
+  newFolderName.value = ''
+}
+
+function cancelNewFolder() {
+  showNewFolderDialog.value = false
+  newFolderCollectionId.value = null
+  newFolderParentId.value = undefined
+  newFolderName.value = ''
 }
 
 function handleContextMenuClickoutside() {
@@ -198,27 +301,32 @@ const filteredCollections = computed(() => {
   const query = searchQuery.value.toLowerCase()
   const isMethodSearch = HTTP_METHODS.some(m => m.toLowerCase() === query)
 
+  const matchRequest = (r: Request) =>
+    r.name.toLowerCase().includes(query) ||
+    r.url.toLowerCase().includes(query) ||
+    (isMethodSearch && r.method.toLowerCase() === query)
+
+  // 递归过滤文件夹树：保留命中的 requests 和含命中的子文件夹
+  const filterFolders = (folders: Folder[]): Folder[] => {
+    return folders
+      .map(folder => ({
+        ...folder,
+        folders: filterFolders(folder.folders),
+        requests: folder.requests.filter(matchRequest),
+      }))
+      .filter(f => f.folders.length > 0 || f.requests.length > 0)
+  }
+
   return requestStore.collections
     .map(collection => ({
       ...collection,
-      requests: collection.requests.filter(r =>
-        r.name.toLowerCase().includes(query) ||
-        r.url.toLowerCase().includes(query) ||
-        (isMethodSearch && r.method.toLowerCase() === query)
-      ),
-      folders: collection.folders.map(folder => ({
-        ...folder,
-        requests: folder.requests.filter(r =>
-          r.name.toLowerCase().includes(query) ||
-          r.url.toLowerCase().includes(query) ||
-          (isMethodSearch && r.method.toLowerCase() === query)
-        )
-      }))
+      requests: collection.requests.filter(matchRequest),
+      folders: filterFolders(collection.folders),
     }))
     .filter(c =>
       c.name.toLowerCase().includes(query) ||
       c.requests.length > 0 ||
-      c.folders.some(f => f.requests.length > 0)
+      c.folders.length > 0
     )
 })
 
@@ -442,6 +550,23 @@ watch(
             </div>
           </div>
           <div v-if="expandedKeys.has(collection.id)" class="sub-list">
+            <!-- 递归渲染文件夹树 -->
+            <FolderNode
+              v-for="folder in collection.folders"
+              :key="folder.id"
+              :folder="folder"
+              :collection-id="collection.id"
+              :depth="0"
+              :expanded-keys="expandedKeys"
+              :drop-folder-id="dragState.dropFolderId"
+              @toggle-expand="(key: string) => toggleExpand(key)"
+              @select-request="(r: Request, cid: string) => selectRequest(r, cid)"
+              @open-request="(r: Request, cid: string) => openRequest(r, cid)"
+              @context-request="(e: MouseEvent, r: Request, cid: string, fid: string) => handleFolderRequestContextMenu(e, r, cid, fid)"
+              @rename-request="(id: string, name: string) => startRename(id, name, 'request')"
+              @delete-request="(cid: string, rid: string) => requestStore.deleteRequest(cid, rid)"
+              @drag-start="(e: MouseEvent, r: Request, cid: string, fid: string) => handleRequestDragStart(e, r, cid, 0, fid)"
+            />
             <template
               v-for="(request, requestIndex) in collection.requests"
               :key="request.id"
@@ -598,6 +723,25 @@ watch(
         <NSpace justify="end" style="margin-top: 16px">
           <NButton @click="cancelNewCollection">{{ t('common.cancel') }}</NButton>
           <NButton type="primary" @click="confirmNewCollection">{{ t('common.confirm') }}</NButton>
+        </NSpace>
+      </div>
+    </NModal>
+
+    <NModal
+      v-model:show="showNewFolderDialog"
+      preset="card"
+      :title="t('collection.newFolder')"
+      style="width: 360px"
+    >
+      <div class="new-collection-dialog">
+        <NInput
+          v-model:value="newFolderName"
+          :placeholder="t('collection.newFolder')"
+          @keyup.enter="confirmNewFolder"
+        />
+        <NSpace justify="end" style="margin-top: 16px">
+          <NButton @click="cancelNewFolder">{{ t('common.cancel') }}</NButton>
+          <NButton type="primary" @click="confirmNewFolder">{{ t('common.confirm') }}</NButton>
         </NSpace>
       </div>
     </NModal>
