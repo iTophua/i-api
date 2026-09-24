@@ -31,3 +31,6 @@ src-tauri/target/
 
 # Playwright MCP debug files
 .playwright-mcp/
+
+# ZCode local state
+.zcode/
