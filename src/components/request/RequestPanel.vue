@@ -234,7 +234,13 @@ async function sendRequest(download = false) {
       message.info(t('errors.requestCancelled'))
     } else {
       requestStore.error = errorMsg
-      message.error(`${t('errors.unknownError')}: ${e}`)
+      // 后端返回的错误已是可读的中文描述（如"连接失败…"），直接展示；
+      // 仅对前端异常等未知错误附加"发生未知错误"前缀
+      const isBackendError =
+        /^(连接失败|请求超时|重定向过多|请求构造失败|请求体发送失败|响应解码失败|请求失败|代理配置错误|创建HTTP客户端失败)/.test(
+          errorMsg,
+        )
+      message.error(isBackendError ? errorMsg : `${t('errors.unknownError')}: ${e}`)
     }
   } finally {
     requestStore.isLoading = false

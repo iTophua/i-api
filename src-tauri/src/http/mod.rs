@@ -331,7 +331,35 @@ fn format_reqwest_error(e: &reqwest::Error) -> String {
         msg.push_str(&format!(": {}", source));
     }
 
+    // macOS 15+ 的「本地网络」隐私权限会静默拦截到内网地址的 TCP 连接，
+    // 终端 curl 可达但应用内失败时，给出可操作的排查提示
+    #[cfg(target_os = "macos")]
+    if e.is_connect() {
+        let host = e.url().and_then(|u| u.host_str()).unwrap_or_default();
+        if is_private_host(host) {
+            msg.push_str("（提示：macOS 需在 系统设置 → 隐私与安全性 → 本地网络 中允许 iApi）");
+        }
+    }
+
     msg
+}
+
+#[cfg(target_os = "macos")]
+fn is_private_host(host: &str) -> bool {
+    if host == "localhost" || host == "::1" || host.ends_with(".local") {
+        return true;
+    }
+    if host.starts_with("192.168.") || host.starts_with("10.") {
+        return true;
+    }
+    if let Some(rest) = host.strip_prefix("172.") {
+        if let Some((octet, _)) = rest.split_once('.') {
+            if let Ok(n) = octet.parse::<u8>() {
+                return (16..=31).contains(&n);
+            }
+        }
+    }
+    false
 }
 
 fn build_url_with_auth(

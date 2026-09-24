@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- macOS 15+ 要求访问局域网/内网地址的应用声明用途，否则可能被静默拒绝连接 -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>iApi 需要访问本地网络，以便连接局域网内的 API 服务（如内网测试环境）。</string>
+</dict>
+</plist>
