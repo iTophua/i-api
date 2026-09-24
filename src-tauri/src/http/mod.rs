@@ -327,8 +327,16 @@ fn format_reqwest_error(e: &reqwest::Error) -> String {
         msg.push_str(&format!(" ({})", url));
     }
 
-    if let Some(source) = std::error::Error::source(e) {
-        msg.push_str(&format!(": {}", source));
+    // 逐层下钻错误源，取最底层的操作系统级错误（如 Connection refused / Operation not permitted），
+    // 仅显示中间层（如 "client error (Connect)"）无法定位真实原因
+    let mut root = std::error::Error::source(e);
+    let mut last = root;
+    while let Some(err) = root {
+        last = Some(err);
+        root = err.source();
+    }
+    if let Some(err) = last {
+        msg.push_str(&format!(": {}", err));
     }
 
     // macOS 15+ 的「本地网络」隐私权限会静默拦截到内网地址的 TCP 连接，
