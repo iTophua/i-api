@@ -51,7 +51,7 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": null,
+      "signingIdentity": "iApi Dev",
       "dmg": {
         "background": "icons/dmg-background.png",
         "windowPosition": {
