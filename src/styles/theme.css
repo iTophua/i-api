@@ -3,17 +3,17 @@
 
 :root {
   /* ===== 品牌主色 ===== */
-  /* 主色 - 蓝色，代表专业、可靠 */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* 主色 - 紫色，与应用 Logo (iApi) 的品牌渐变保持一致 */
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+  --color-primary-800: #5b21b6;
+  --color-primary-900: #4c1d95;
 
   /* ===== 功能色 ===== */
   /* 成功色 - 绿色 */
@@ -80,7 +80,7 @@
   /* 边框颜色 */
   --color-border: #e5e7eb;
   --color-border-secondary: #f3f4f6;
-  --color-border-focus: #3b82f6;
+  --color-border-focus: #7c3aed;
 
   /* ===== 语义化颜色映射 ===== */
   --color-brand: var(--color-primary-500);
@@ -89,20 +89,21 @@
   --color-brand-light: var(--color-primary-50);
 
   /* ===== 请求方法颜色 ===== */
-  --color-method-get: #10b981;
-  --color-method-get-bg: rgba(16, 185, 129, 0.1);
-  --color-method-post: #3b82f6;
-  --color-method-post-bg: rgba(59, 130, 246, 0.1);
-  --color-method-put: #f59e0b;
-  --color-method-put-bg: rgba(245, 158, 11, 0.1);
-  --color-method-delete: #ef4444;
-  --color-method-delete-bg: rgba(239, 68, 68, 0.1);
-  --color-method-patch: #8b5cf6;
-  --color-method-patch-bg: rgba(139, 92, 246, 0.1);
-  --color-method-head: #06b6d4;
-  --color-method-head-bg: rgba(6, 182, 212, 0.1);
-  --color-method-options: #ec4899;
-  --color-method-options-bg: rgba(236, 72, 153, 0.1);
+  /* 采纳 Swagger/OpenAPI 生态的通用方法配色，开发者认知成本最低 */
+  --color-method-get: #3182ce;
+  --color-method-get-bg: rgba(49, 130, 206, 0.1);
+  --color-method-post: #38a169;
+  --color-method-post-bg: rgba(56, 161, 105, 0.1);
+  --color-method-put: #dd6b20;
+  --color-method-put-bg: rgba(221, 107, 32, 0.1);
+  --color-method-delete: #e53e3e;
+  --color-method-delete-bg: rgba(229, 62, 62, 0.1);
+  --color-method-patch: #805ad5;
+  --color-method-patch-bg: rgba(128, 90, 213, 0.1);
+  --color-method-head: #319795;
+  --color-method-head-bg: rgba(49, 151, 149, 0.1);
+  --color-method-options: #6b7280;
+  --color-method-options-bg: rgba(107, 114, 128, 0.1);
 
   /* ===== 响应状态码颜色 ===== */
   --color-status-success: #10b981;
@@ -186,6 +187,7 @@
 }
 
 /* ===== 暗色主题 ===== */
+/* 背景采用三层 elevation：base(窗体) < secondary(面板) < tertiary(浮起)，配合边框区分层级 */
 [data-theme='dark'] {
   /* 文本颜色 */
   --color-text-primary: #f9fafb;
@@ -194,18 +196,21 @@
   --color-text-disabled: #6b7280;
 
   /* 背景颜色 */
-  --color-bg-base: #1a1a1a;
-  --color-bg-secondary: #262626;
-  --color-bg-tertiary: #333333;
-  --color-bg-elevated: #262626;
+  --color-bg-base: #141414;
+  --color-bg-secondary: #1e1e1e;
+  --color-bg-tertiary: #282828;
+  --color-bg-elevated: #1e1e1e;
 
   /* 边框颜色 */
-  --color-border: #404040;
-  --color-border-secondary: #333333;
-  --color-border-focus: #60a5fa;
+  --color-border: #383838;
+  --color-border-secondary: #2a2a2a;
+  --color-border-focus: #a78bfa;
 
   /* 调整部分颜色的暗色模式表现 */
-  --color-brand-light: rgba(59, 130, 246, 0.15);
+  --color-brand: var(--color-primary-400);
+  --color-brand-hover: var(--color-primary-300);
+  --color-brand-active: var(--color-primary-500);
+  --color-brand-light: rgba(139, 92, 246, 0.16);
 }
 
 /* ===== 工具类 ===== */

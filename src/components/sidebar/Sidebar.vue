@@ -3,6 +3,9 @@ import { NTabs, NTabPane, NButton, NIcon, NInput, NTooltip, NDropdown, NModal, N
 import {
   ChevronBackOutline,
   ChevronForwardOutline,
+  CloudUploadOutline,
+  DownloadOutline,
+  CodeSlashOutline,
 } from '@vicons/ionicons5'
 import { ref, computed, nextTick, watch } from 'vue'
 import { useRequestStore, useEnvironmentStore } from '@/stores'
@@ -370,6 +373,18 @@ function handleToggle() {
   emit('toggle')
 }
 
+const importOptions = [
+  { label: () => t('import.curl'), key: 'curl' },
+  { label: () => t('import.postman'), key: 'postman' },
+  { label: () => t('import.openapi'), key: 'openapi' },
+  { label: () => t('import.har'), key: 'har' },
+]
+
+const codeOptions = [
+  { label: () => t('request.copyAsCurl'), key: 'copy-curl' },
+  { label: () => t('codeGenerator.generateCode'), key: 'generate' },
+]
+
 function openBatchDialog(mode: 'copy' | 'move') {
   batchMode.value = mode
   showBatchDialog.value = true
@@ -651,7 +666,10 @@ watch(
           </div>
         </template>
         <div v-if="filteredCollections.length === 0" class="empty-state">
-          {{ t('collection.noCollections') }}
+          <p>{{ t('collection.noCollections') }}</p>
+          <NButton size="small" type="primary" secondary @click="openNewCollectionDialog()">
+            {{ t('collection.newCollection') }}
+          </NButton>
         </div>
       </div>
 
@@ -664,18 +682,41 @@ watch(
     </div>
 
     <div class="sidebar-footer">
-      <div class="sidebar-logo">
-        <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-          <rect width="32" height="32" rx="6" fill="#18A058" />
-          <path
-            d="M8 12L16 8L24 12V20L16 24L8 20V12Z"
-            stroke="white"
-            stroke-width="2"
-            fill="none"
-          />
-          <circle cx="16" cy="16" r="3" fill="white" />
-        </svg>
-        <span class="logo-text">iApi</span>
+      <div v-if="!collapsed" class="footer-tools">
+        <NDropdown :options="importOptions" placement="top" @select="(key: string) => emit('import', key)">
+          <NTooltip :show-arrow="false" placement="top">
+            <template #trigger>
+              <NButton text circle size="small" class="tool-btn">
+                <template #icon>
+                  <NIcon :component="CloudUploadOutline" />
+                </template>
+              </NButton>
+            </template>
+            {{ t('import.import') }}
+          </NTooltip>
+        </NDropdown>
+        <NTooltip :show-arrow="false" placement="top">
+          <template #trigger>
+            <NButton text circle size="small" class="tool-btn" @click="emit('export')">
+              <template #icon>
+                <NIcon :component="DownloadOutline" />
+              </template>
+            </NButton>
+          </template>
+          {{ t('export.export') }}
+        </NTooltip>
+        <NDropdown :options="codeOptions" placement="top" @select="(key: string) => emit('code', key)">
+          <NTooltip :show-arrow="false" placement="top">
+            <template #trigger>
+              <NButton text circle size="small" class="tool-btn">
+                <template #icon>
+                  <NIcon :component="CodeSlashOutline" />
+                </template>
+              </NButton>
+            </template>
+            {{ t('codeGenerator.codeGenerator') }}
+          </NTooltip>
+        </NDropdown>
       </div>
       <div class="footer-actions">
         <NTooltip :show-arrow="false" placement="top">
@@ -765,13 +806,9 @@ watch(
   right: 0;
   bottom: 0;
   width: 1px;
-  background: var(--color-border, #e5e7eb) !important;
+  background: var(--color-border);
   pointer-events: none;
   z-index: 9999;
-}
-
-:global([data-theme='dark']) .sidebar::after {
-  background: #404040 !important;
 }
 
 .sidebar.collapsed {
@@ -1195,29 +1232,36 @@ watch(
 }
 
 .empty-state {
-  padding: 20px 10px;
+  padding: 24px 10px;
   text-align: center;
   color: var(--n-text-color-3);
   font-size: var(--font-size-compact-sm);
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 .sidebar-footer {
-  height: 32px;
+  height: 36px;
   padding: 0 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--n-border-color);
+  border-top: 1px solid var(--color-border);
   flex-shrink: 0;
-  background: var(--n-color-modal);
+  background: var(--color-bg-elevated);
 }
 
-.sidebar-logo {
+.footer-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  gap: 2px;
+}
+
+.tool-btn {
+  color: var(--n-text-color-2);
 }
 
 .footer-actions {
@@ -1227,44 +1271,9 @@ watch(
   flex-shrink: 0;
 }
 
-.logo-text {
-  font-size: var(--font-size-compact-sm);
-  font-weight: 700;
-  color: var(--n-text-color-1);
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .sidebar.collapsed .sidebar-footer {
   justify-content: center;
   padding: 0;
-}
-
-.sidebar.collapsed .logo-text {
-  display: none;
-}
-
-/* 响应式设计 */
-@media (max-width: 1200px) {
-  .sidebar {
-    width: 200px;
-  }
-}
-
-@media (max-width: 900px) {
-  .sidebar {
-    width: 48px !important;
-    min-width: 48px !important;
-    max-width: 48px !important;
-  }
-}
-
-@media (min-width: 1600px) {
-  .sidebar {
-    width: 280px;
-  }
 }
 
 .history-tab-container {
@@ -1280,18 +1289,4 @@ watch(
   display: flex;
   flex-direction: column;
 }
-
-/* 紧凑模式下的标签页文本隐藏 */
-@media (max-width: 1300px) {
-  .tab-label span:not(.icon) {
-    display: none;
-  }
-  
-  .tab-label {
-    justify-content: center;
-    gap: 0;
-  }
-}
-
-
 </style>

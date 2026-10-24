@@ -1,17 +1,17 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD'
 
-// HTTP 方法颜色配置（统一颜色定义）
+// HTTP 方法颜色配置（统一引用 theme.css 的 --color-method-*，仅限 inline style 场景使用）
 export const HTTP_METHOD_COLORS: Record<
   HttpMethod,
   { color: string; background: string }
 > = {
-  GET: { color: '#61affe', background: 'rgba(97, 175, 254, 0.1)' },
-  POST: { color: '#49cc90', background: 'rgba(73, 204, 144, 0.1)' },
-  PUT: { color: '#fca130', background: 'rgba(252, 161, 48, 0.1)' },
-  DELETE: { color: '#f93e3e', background: 'rgba(249, 62, 62, 0.1)' },
-  PATCH: { color: '#50e3c2', background: 'rgba(80, 227, 194, 0.1)' },
-  OPTIONS: { color: '#9012fe', background: 'rgba(144, 18, 254, 0.1)' },
-  HEAD: { color: '#9012fe', background: 'rgba(144, 18, 254, 0.1)' },
+  GET: { color: 'var(--color-method-get)', background: 'var(--color-method-get-bg)' },
+  POST: { color: 'var(--color-method-post)', background: 'var(--color-method-post-bg)' },
+  PUT: { color: 'var(--color-method-put)', background: 'var(--color-method-put-bg)' },
+  DELETE: { color: 'var(--color-method-delete)', background: 'var(--color-method-delete-bg)' },
+  PATCH: { color: 'var(--color-method-patch)', background: 'var(--color-method-patch-bg)' },
+  OPTIONS: { color: 'var(--color-method-options)', background: 'var(--color-method-options-bg)' },
+  HEAD: { color: 'var(--color-method-head)', background: 'var(--color-method-head-bg)' },
 }
 
 export type Locale = 'zh-CN' | 'en-US'

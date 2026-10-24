@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NButton, NIcon, NDropdown, useMessage, NSplit, NModal } from 'naive-ui'
 import { CloseOutline, AddOutline } from '@vicons/ionicons5'
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useSettingsStore, useEnvironmentStore, useRequestStore } from '@/stores'
 import { useShortcuts } from '@/composables/useShortcuts'
 import { useI18n } from '@/composables/useI18n'
@@ -55,6 +55,78 @@ const contextMenuY = ref(0)
 const contextMenuTabId = ref<string | null>(null)
 
 const { dragState, handleDragStart, cleanup: cleanupDrag } = useTabDrag(requestStore.moveTab)
+
+/* ===== 请求 tab 溢出检测与激活跟随 ===== */
+const tabsScrollEl = ref<HTMLElement | null>(null)
+const tabsOverflowLeft = ref(false)
+const tabsOverflowRight = ref(false)
+
+function checkTabsOverflow() {
+  const el = tabsScrollEl.value
+  if (!el) {
+    tabsOverflowLeft.value = false
+    tabsOverflowRight.value = false
+    return
+  }
+  const hasOverflow = el.scrollWidth > el.clientWidth + 1
+  tabsOverflowLeft.value = hasOverflow && el.scrollLeft > 4
+  tabsOverflowRight.value = hasOverflow && el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+
+function scrollActiveTabIntoView() {
+  nextTick(() => {
+    tabsScrollEl.value
+      ?.querySelector('.tab-item.active')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+  })
+}
+
+/* ===== 侧栏拖拽调宽（220–420px，与折叠状态互斥） ===== */
+const sidebarWidth = ref(300)
+const sidebarResizing = ref(false)
+let tabsResizeObserver: ResizeObserver | null = null
+
+function handleSidebarResizeStart(e: MouseEvent) {
+  e.preventDefault()
+  sidebarResizing.value = true
+  const startX = e.clientX
+  const startWidth = sidebarWidth.value
+  const onMove = (ev: MouseEvent) => {
+    sidebarWidth.value = Math.min(420, Math.max(220, startWidth + ev.clientX - startX))
+  }
+  const onUp = () => {
+    sidebarResizing.value = false
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+/* tabs-bar 是 v-if 渲染的，el 挂载/销毁时同步管理 observer 生命周期 */
+watch(
+  tabsScrollEl,
+  (el, _prev, onCleanup) => {
+    tabsResizeObserver?.disconnect()
+    if (el) {
+      tabsResizeObserver = new ResizeObserver(checkTabsOverflow)
+      tabsResizeObserver.observe(el)
+      checkTabsOverflow()
+    }
+    onCleanup(() => tabsResizeObserver?.disconnect())
+  },
+  { flush: 'post' }
+)
+
+watch(
+  () => requestStore.activeTabId,
+  () => scrollActiveTabIntoView()
+)
+
+watch(
+  () => requestStore.tabs.length,
+  () => scrollActiveTabIntoView()
+)
 
 function toggleSidebar() {
   collapsed.value = !collapsed.value
@@ -214,6 +286,7 @@ onMounted(async () => {
 onUnmounted(() => {
   saveAppState()
   cleanupDrag()
+  tabsResizeObserver?.disconnect()
 })
 
 watch(collapsed, (val) => {
@@ -342,16 +415,17 @@ useShortcuts([
 <template>
   <div class="home-view">
     <TitleBar
-      @import="handleImportSelect"
-      @export="handleExport"
-      @code="handleCodeSelect"
       @toggle-theme="toggleTheme"
       @select-environment="environmentStore.setCurrentEnvironment"
       @open-settings="showSettings = true"
       @open-environment-manager="handleOpenEnvironmentManager"
     />
     <div class="main-layout">
-      <div class="sidebar-wrapper" :class="{ collapsed }">
+      <div
+        class="sidebar-wrapper"
+        :class="{ collapsed, resizing: sidebarResizing }"
+        :style="collapsed ? undefined : { width: `${sidebarWidth}px` }"
+      >
         <Sidebar
           :collapsed="collapsed"
           @toggle="toggleSidebar"
@@ -361,10 +435,16 @@ useShortcuts([
           @settings="showSettings = true"
           @code="handleCodeSelect"
         />
+        <div
+          v-if="!collapsed"
+          class="sidebar-resizer"
+          :class="{ active: sidebarResizing }"
+          @mousedown="handleSidebarResizeStart"
+        ></div>
       </div>
       <div class="main-content">
         <div v-if="requestStore.tabs.length > 0" class="tabs-bar">
-          <div class="tabs-scroll">
+          <div ref="tabsScrollEl" class="tabs-scroll" @scroll.passive="checkTabsOverflow">
             <div
               v-for="(tab, index) in requestStore.tabs"
               :key="tab.id"
@@ -413,6 +493,8 @@ useShortcuts([
               <NIcon :component="AddOutline" size="16" />
             </NButton>
           </div>
+          <div v-if="tabsOverflowLeft" class="tabs-fade left" aria-hidden="true"></div>
+          <div v-if="tabsOverflowRight" class="tabs-fade" aria-hidden="true"></div>
           <NDropdown
             :show="showContextMenu"
             :options="contextMenuOptions"
@@ -427,9 +509,10 @@ useShortcuts([
         <div v-if="requestStore.tabs.length > 0" class="panels-container">
           <NSplit
             direction="vertical"
-            :default-size="0.5"
+            :default-size="0.62"
             :min="0.15"
             :max="0.85"
+            :resize-trigger-size="5"
             style="height: 100%"
           >
             <template #1>
@@ -448,6 +531,9 @@ useShortcuts([
                 <NIcon :component="AddOutline" />
               </template>
               {{ t('request.newRequest') }}
+            </NButton>
+            <NButton quaternary size="large" @click="showCurlImport = true">
+              {{ t('import.curl') }}
             </NButton>
             <p class="empty-hint">{{ t('request.enterUrl') }}</p>
           </div>
@@ -508,7 +594,7 @@ useShortcuts([
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--n-color-modal);
+  background: var(--color-bg-base);
 }
 
 .main-layout {
@@ -522,11 +608,32 @@ useShortcuts([
   width: 300px;
   flex-shrink: 0;
   transition: width 0.2s ease;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 .sidebar-wrapper.collapsed {
   width: 48px;
+}
+
+.sidebar-wrapper.resizing {
+  transition: none;
+}
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  transition: background-color var(--transition-fast);
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.active {
+  background-color: var(--color-brand-light);
 }
 
 .main-layout :deep(.n-split) {
@@ -545,19 +652,20 @@ useShortcuts([
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--n-color);
+  background: var(--color-bg-elevated);
   position: relative;
 }
 
 .tabs-bar {
   height: 32px;
-  background: var(--n-color);
-  border-bottom: 1px solid var(--n-border-color);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   padding: 0 8px;
   flex-shrink: 0;
   gap: 4px;
+  position: relative;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -572,6 +680,21 @@ useShortcuts([
 
 .tabs-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.tabs-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--color-bg-elevated));
+}
+
+.tabs-fade.left {
+  left: 0;
+  right: auto;
+  background: linear-gradient(to left, transparent, var(--color-bg-elevated));
 }
 
 .tab-item {
@@ -637,32 +760,32 @@ useShortcuts([
 }
 
 .method-get {
-  color: #61affe;
-  background: rgba(97, 175, 254, 0.1);
+  color: var(--color-method-get);
+  background: var(--color-method-get-bg);
 }
 .method-post {
-  color: #49cc90;
-  background: rgba(73, 204, 144, 0.1);
+  color: var(--color-method-post);
+  background: var(--color-method-post-bg);
 }
 .method-put {
-  color: #fca130;
-  background: rgba(252, 161, 48, 0.1);
+  color: var(--color-method-put);
+  background: var(--color-method-put-bg);
 }
 .method-delete {
-  color: #f93e3e;
-  background: rgba(249, 62, 62, 0.1);
+  color: var(--color-method-delete);
+  background: var(--color-method-delete-bg);
 }
 .method-patch {
-  color: #50e3c2;
-  background: rgba(80, 227, 194, 0.1);
+  color: var(--color-method-patch);
+  background: var(--color-method-patch-bg);
 }
 .method-options {
-  color: #9012fe;
-  background: rgba(144, 18, 254, 0.1);
+  color: var(--color-method-options);
+  background: var(--color-method-options-bg);
 }
 .method-head {
-  color: #9012fe;
-  background: rgba(144, 18, 254, 0.1);
+  color: var(--color-method-head);
+  background: var(--color-method-head-bg);
 }
 
 .tab-name {
@@ -718,8 +841,29 @@ useShortcuts([
   overflow: hidden;
 }
 
-.panels-container :deep(.n-split-bar) {
-  cursor: ns-resize;
+/* naive-ui 分割条的真实类名是 n-split__resize-trigger（wrapper 负责事件） */
+.panels-container :deep(.n-split__resize-trigger-wrapper) {
+  position: relative;
+}
+
+.panels-container :deep(.n-split__resize-trigger) {
+  transition: background-color var(--transition-fast);
+}
+
+.panels-container :deep(.n-split__resize-trigger-wrapper:hover .n-split__resize-trigger) {
+  background-color: var(--color-border);
+}
+
+.panels-container :deep(.n-split__resize-trigger-wrapper:hover)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
 }
 
 .empty-state {
@@ -749,14 +893,6 @@ useShortcuts([
   color: var(--n-text-color-3);
   font-size: 14px;
   line-height: 1.6;
-}
-
-/* 响应式设计 */
-@media (max-width: 1400px) {
-  .panels-container {
-    padding: 4px;
-    gap: 4px;
-  }
 }
 
 @media (max-width: 1200px) {

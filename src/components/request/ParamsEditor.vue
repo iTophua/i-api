@@ -70,6 +70,7 @@ const columns: DataTableColumns<KeyValuePair> = [
   {
     title: '描述',
     key: 'description',
+    width: 180,
     render: (row, index) =>
       h(VariableInput, {
         value: row.description || '',

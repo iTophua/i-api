@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NConfigProvider, NMessageProvider, NDialogProvider, darkTheme, lightTheme } from 'naive-ui'
+import { NConfigProvider, NMessageProvider, NDialogProvider, darkTheme, lightTheme, zhCN, enUS } from 'naive-ui'
+import type { GlobalThemeOverrides } from 'naive-ui'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore, useRequestStore } from '@/stores'
 
@@ -12,6 +13,32 @@ const theme = computed(() => {
   if (currentTheme === 'light') return lightTheme
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? darkTheme : lightTheme
 })
+
+/* naive-ui 内置文案（空数据、分页等）跟随应用语言 */
+const naiveLocale = computed(() => (settingsStore.settings.language === 'en-US' ? enUS : zhCN))
+
+const isDarkTheme = computed(() => theme.value === darkTheme)
+
+/* 品牌主色与 theme.css 的紫色 scale 保持一致：
+   浅色用 600(#7c3aed)，暗色用 400(#a78bfa) 保证深底上的对比度 */
+const themeOverrides = computed<GlobalThemeOverrides>(() => ({
+  common: {
+    borderRadius: '6px',
+    borderRadiusSmall: '4px',
+    primaryColor: isDarkTheme.value ? '#a78bfa' : '#7c3aed',
+    primaryColorHover: isDarkTheme.value ? '#c4b5fd' : '#8b5cf6',
+    primaryColorPressed: isDarkTheme.value ? '#8b5cf6' : '#6d28d9',
+    primaryColorSuppl: isDarkTheme.value ? '#a78bfa' : '#8b5cf6',
+    ...(isDarkTheme.value
+      ? {
+          bodyColor: '#141414',
+          cardColor: '#1e1e1e',
+          modalColor: '#1e1e1e',
+          popoverColor: '#2a2a2a',
+        }
+      : {}),
+  },
+}))
 
 async function handleBeforeUnload() {
   await requestStore.saveTabs()
@@ -28,7 +55,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <NConfigProvider :theme="theme">
+  <NConfigProvider :theme="theme" :theme-overrides="themeOverrides" :locale="naiveLocale">
     <NMessageProvider>
       <NDialogProvider>
         <router-view />

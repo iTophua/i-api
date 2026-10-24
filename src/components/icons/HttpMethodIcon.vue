@@ -24,19 +24,19 @@ const iconPaths: Record<HttpMethod, string> = {
   HEAD: 'M8 4V16H10V10H13L15 16H17.21L14.5 8.73L17 4H14.5L13 7.5L11.5 4H8Z',
 }
 
-const colors: Record<HttpMethod, string> = {
-  GET: '#10b981',
-  POST: '#3b82f6',
-  PUT: '#f59e0b',
-  DELETE: '#ef4444',
-  PATCH: '#8b5cf6',
-  OPTIONS: '#06b6d4',
-  HEAD: '#ec4899',
+/* 颜色统一来自 theme.css 的 --color-method-*，与 tab 标签、方法选择器保持一致 */
+const methodVar: Record<HttpMethod, string> = {
+  GET: '--color-method-get',
+  POST: '--color-method-post',
+  PUT: '--color-method-put',
+  DELETE: '--color-method-delete',
+  PATCH: '--color-method-patch',
+  OPTIONS: '--color-method-options',
+  HEAD: '--color-method-head',
 }
 
 const viewBox = computed(() => `0 0 24 24`)
-const fillColor = computed(() => (props.filled ? colors[props.method] : 'currentColor'))
-const strokeColor = computed(() => colors[props.method])
+const pathStyle = computed(() => ({ color: `var(${methodVar[props.method]})` }))
 </script>
 
 <template>
@@ -50,8 +50,9 @@ const strokeColor = computed(() => colors[props.method])
   >
     <path
       :d="iconPaths[method]"
-      :fill="fillColor"
-      :stroke="!filled ? strokeColor : 'none'"
+      :style="pathStyle"
+      :fill="filled ? 'currentColor' : 'none'"
+      :stroke="filled ? 'none' : 'currentColor'"
       :stroke-width="filled ? 0 : 1.5"
       stroke-linecap="round"
       stroke-linejoin="round"

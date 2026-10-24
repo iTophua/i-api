@@ -743,10 +743,10 @@ onUnmounted(() => {
   align-items: center;
   padding: 8px 12px;
   gap: 8px;
-  border-bottom: 1px solid var(--n-border-color);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   min-height: 44px;
-  background: var(--n-color-modal);
+  background: var(--color-bg-elevated);
 }
 
 .url-input {
@@ -802,6 +802,8 @@ onUnmounted(() => {
 .save-btn-group {
   display: flex;
   align-items: center;
+  /* 与发送按钮组拉开距离，突出发送是主操作 */
+  margin-left: 8px;
 }
 
 .save-btn-dropdown {
