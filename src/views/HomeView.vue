@@ -19,7 +19,6 @@ import HarImportModal from '@/components/common/HarImportModal.vue'
 import SaveRequestModal from '@/components/common/SaveRequestModal.vue'
 import SettingsModal from '@/components/common/SettingsModal.vue'
 import EnvironmentManager from '@/components/environment/EnvironmentManager.vue'
-import { generateCode } from '@/utils/codeGenerator'
 import type { RequestTab } from '@/types'
 import { normalizeRequest, type RawRequest } from '@/types'
 
@@ -165,20 +164,6 @@ function handleRequestsImport(requests: RawRequest[], _source: string) {
 
 function handleExport() {
   showPostmanExport.value = true
-}
-
-function handleCodeSelect(key: string) {
-  if (key === 'copy-curl') {
-    copyAsCurl()
-  } else if (key === 'generate') {
-    showCodeGenerator.value = true
-  }
-}
-
-function copyAsCurl() {
-  const curl = generateCode(requestStore.currentRequest, 'curl', { includeDependencies: false })
-  navigator.clipboard.writeText(curl)
-  message.success(t('request.copyAsCurl'))
 }
 
 function sendRequest() {
@@ -433,7 +418,6 @@ useShortcuts([
           @import="handleImportSelect"
           @export="handleExport"
           @settings="showSettings = true"
-          @code="handleCodeSelect"
         />
         <div
           v-if="!collapsed"
@@ -516,7 +500,7 @@ useShortcuts([
             style="height: 100%"
           >
             <template #1>
-              <RequestPanel />
+              <RequestPanel @open-code-generator="showCodeGenerator = true" />
             </template>
             <template #2>
               <ResponsePanel />

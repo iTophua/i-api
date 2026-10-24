@@ -5,7 +5,6 @@ import {
   ChevronForwardOutline,
   CloudUploadOutline,
   DownloadOutline,
-  CodeSlashOutline,
 } from '@vicons/ionicons5'
 import { ref, computed, nextTick, watch } from 'vue'
 import { useRequestStore, useEnvironmentStore } from '@/stores'
@@ -34,7 +33,6 @@ const emit = defineEmits<{
   import: [key: string]
   export: []
   settings: []
-  code: [key: string]
 }>()
 
 const requestStore = useRequestStore()
@@ -374,16 +372,23 @@ function handleToggle() {
 }
 
 const importOptions = [
-  { label: () => t('import.curl'), key: 'curl' },
   { label: () => t('import.postman'), key: 'postman' },
   { label: () => t('import.openapi'), key: 'openapi' },
   { label: () => t('import.har'), key: 'har' },
 ]
 
-const codeOptions = [
-  { label: () => t('request.copyAsCurl'), key: 'copy-curl' },
-  { label: () => t('codeGenerator.generateCode'), key: 'generate' },
+const addOptions = [
+  { label: () => t('collection.newCollection'), key: 'new-collection' },
+  { label: () => t('import.curl'), key: 'curl' },
 ]
+
+function handleAddSelect(key: string | number) {
+  if (key === 'new-collection') {
+    openNewCollectionDialog()
+  } else if (key === 'curl') {
+    emit('import', 'curl')
+  }
+}
 
 function openBatchDialog(mode: 'copy' | 'move') {
   batchMode.value = mode
@@ -446,16 +451,18 @@ watch(
           <AppIcon type="search" :size="14" />
         </template>
       </NInput>
-      <NButton
-          size="small"
-          type="primary"
-          class="add-btn"
-          @click="openNewCollectionDialog()"
-        >
-        <template #icon>
-          <AppIcon type="plus" :size="14" />
-        </template>
-      </NButton>
+      <NDropdown
+        :options="addOptions"
+        trigger="click"
+        placement="bottom-end"
+        @select="handleAddSelect"
+      >
+        <NButton size="small" type="primary" class="add-btn" aria-label="新建或导入">
+          <template #icon>
+            <AppIcon type="plus" :size="14" />
+          </template>
+        </NButton>
+      </NDropdown>
     </div>
 
     <div class="sidebar-content">
@@ -705,18 +712,6 @@ watch(
           </template>
           {{ t('export.export') }}
         </NTooltip>
-        <NDropdown :options="codeOptions" placement="top" @select="(key: string) => emit('code', key)">
-          <NTooltip :show-arrow="false" placement="top">
-            <template #trigger>
-              <NButton text circle size="small" class="tool-btn">
-                <template #icon>
-                  <NIcon :component="CodeSlashOutline" />
-                </template>
-              </NButton>
-            </template>
-            {{ t('codeGenerator.codeGenerator') }}
-          </NTooltip>
-        </NDropdown>
       </div>
       <div class="footer-actions">
         <NTooltip :show-arrow="false" placement="top">
@@ -1257,7 +1252,8 @@ watch(
 .footer-tools {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 10px;
+  padding-left: 4px;
 }
 
 .tool-btn {

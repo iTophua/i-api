@@ -8,10 +8,11 @@ import {
   NBadge,
   NTabs,
   NTabPane,
+  NTooltip,
   useMessage,
   NProgress,
 } from 'naive-ui'
-import { ChevronDownOutline, StopOutline, CopyOutline } from '@vicons/ionicons5'
+import { ChevronDownOutline, StopOutline, CopyOutline, CodeSlashOutline } from '@vicons/ionicons5'
 import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useSettingsStore } from '@/stores'
 import { invoke } from '@tauri-apps/api/core'
@@ -47,6 +48,10 @@ const {
 const currentTab = ref('params')
 const showSaveModal = ref(false)
 const saveMode = ref<'save' | 'save-as'>('save')
+
+const emit = defineEmits<{
+  'open-code-generator': []
+}>()
 
 // 复制当前请求为纯 cURL 命令（不含依赖说明等额外内容）
 function copyAsCurl() {
@@ -609,12 +614,40 @@ onUnmounted(() => {
     <div class="request-tabs-container">
       <NTabs v-model:value="currentTab" type="line" role="tablist" aria-label="请求选项卡">
         <template #suffix>
-          <NButton text size="small" class="copy-curl-btn" @click="copyAsCurl">
-            <template #icon>
-              <NIcon :component="CopyOutline" />
-            </template>
-            {{ t('request.copyAsCurl') }}
-          </NButton>
+          <div class="tab-suffix-actions">
+            <NTooltip :show-arrow="false" placement="bottom">
+              <template #trigger>
+                <NButton
+                  text
+                  size="small"
+                  class="copy-curl-btn"
+                  aria-label="复制为 cURL"
+                  @click="copyAsCurl"
+                >
+                  <template #icon>
+                    <NIcon :component="CopyOutline" />
+                  </template>
+                </NButton>
+              </template>
+              {{ t('request.copyAsCurl') }}
+            </NTooltip>
+            <NTooltip :show-arrow="false" placement="bottom">
+              <template #trigger>
+                <NButton
+                  text
+                  size="small"
+                  class="code-gen-btn"
+                  aria-label="生成代码"
+                  @click="emit('open-code-generator')"
+                >
+                  <template #icon>
+                    <NIcon :component="CodeSlashOutline" />
+                  </template>
+                </NButton>
+              </template>
+              {{ t('codeGenerator.codeGenerator') }}
+            </NTooltip>
+          </div>
         </template>
         <NTabPane name="params" display-directive="show">
           <template #tab>
@@ -952,10 +985,16 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--n-border-color);
 }
 
-.request-tabs-container .copy-curl-btn {
-  margin-right: 8px;
+.request-tabs-container .tab-suffix-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
-  white-space: nowrap;
+}
+
+.request-tabs-container .copy-curl-btn,
+.request-tabs-container .code-gen-btn {
+  padding: 0 4px;
 }
 
 .request-tabs-container :deep(.n-tabs-tab) {
