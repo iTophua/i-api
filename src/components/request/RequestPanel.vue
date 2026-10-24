@@ -12,7 +12,7 @@ import {
   useMessage,
   NProgress,
 } from 'naive-ui'
-import { ChevronDownOutline, StopOutline, CopyOutline, CodeSlashOutline } from '@vicons/ionicons5'
+import { ChevronDownOutline, StopOutline, TerminalOutline, CodeSlashOutline } from '@vicons/ionicons5'
 import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useSettingsStore } from '@/stores'
 import { invoke } from '@tauri-apps/api/core'
@@ -625,7 +625,7 @@ onUnmounted(() => {
                   @click="copyAsCurl"
                 >
                   <template #icon>
-                    <NIcon :component="CopyOutline" />
+                    <NIcon :component="TerminalOutline" />
                   </template>
                 </NButton>
               </template>
