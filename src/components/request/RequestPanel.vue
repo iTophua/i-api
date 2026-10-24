@@ -112,10 +112,30 @@ const saveOptions = computed(() => [{ label: t('request.saveAs'), key: 'save-as'
 
 const sendOptions = computed(() => [{ label: t('request.sendAndDownload'), key: 'send-download' }])
 
-const tabBadges = computed(() => ({
-  params: requestStore.currentRequest.params.filter((p) => p.enabled).length,
-  headers: requestStore.currentRequest.headers.filter((h) => h.enabled).length,
-}))
+const tabBadges = computed(() => {
+  const { body, auth, preScript, postScript } = requestStore.currentRequest
+  let bodyCount = 0
+  let bodyDot = false
+  if (body.mode === 'form-data') {
+    bodyCount = (body.formData ?? []).filter((f) => f.enabled).length
+  } else if (body.mode === 'urlencoded') {
+    bodyCount = (body.urlencoded ?? []).filter((p) => p.enabled).length
+  } else if (body.mode === 'raw') {
+    bodyDot = !!body.raw?.trim()
+  } else if (body.mode === 'binary') {
+    bodyDot = !!body.binary?.trim()
+  }
+
+  return {
+    params: requestStore.currentRequest.params.filter((p) => p.enabled).length,
+    headers: requestStore.currentRequest.headers.filter((h) => h.enabled).length,
+    body: bodyCount,
+    bodyDot,
+    authDot: auth.type !== 'none',
+    preScriptDot: !!preScript?.trim(),
+    postScriptDot: !!postScript?.trim(),
+  }
+})
 
 async function sendRequest(download = false) {
   if (!requestStore.currentRequest.url) {
@@ -612,7 +632,12 @@ onUnmounted(() => {
         </NTabPane>
 
         <NTabPane name="authorization" display-directive="show">
-          <template #tab>{{ t('request.authorization') }}</template>
+          <template #tab>
+            <span class="tab-with-badge">
+              {{ t('request.authorization') }}
+              <NBadge v-if="tabBadges.authDot" dot type="info" />
+            </span>
+          </template>
           <div class="tab-scroll-content">
             <AuthEditor
               :auth="requestStore.currentRequest.auth"
@@ -643,7 +668,13 @@ onUnmounted(() => {
         </NTabPane>
 
         <NTabPane name="body" display-directive="show">
-          <template #tab>{{ t('request.body') }}</template>
+          <template #tab>
+            <span class="tab-with-badge">
+              {{ t('request.body') }}
+              <NBadge v-if="tabBadges.body > 0" :value="tabBadges.body" :max="99" type="info" />
+              <NBadge v-else-if="tabBadges.bodyDot" dot type="info" />
+            </span>
+          </template>
           <div class="tab-scroll-content">
             <BodyEditor
               :body="requestStore.currentRequest.body"
@@ -653,7 +684,12 @@ onUnmounted(() => {
         </NTabPane>
 
         <NTabPane name="preScript" display-directive="show">
-          <template #tab>{{ t('request.preRequestScript') }}</template>
+          <template #tab>
+            <span class="tab-with-badge">
+              {{ t('request.preRequestScript') }}
+              <NBadge v-if="tabBadges.preScriptDot" dot type="info" />
+            </span>
+          </template>
           <div class="tab-editor-content">
             <ScriptEditor
               type="preRequest"
@@ -664,7 +700,12 @@ onUnmounted(() => {
         </NTabPane>
 
         <NTabPane name="tests" display-directive="show">
-          <template #tab>{{ t('request.testScript') }}</template>
+          <template #tab>
+            <span class="tab-with-badge">
+              {{ t('request.testScript') }}
+              <NBadge v-if="tabBadges.postScriptDot" dot type="info" />
+            </span>
+          </template>
           <div class="tab-editor-content">
             <ScriptEditor
               type="test"
