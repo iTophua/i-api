@@ -12,14 +12,14 @@ import RequestPanel from '@/components/request/RequestPanel.vue'
 import ResponsePanel from '@/components/response/ResponsePanel.vue'
 import CurlImportModal from '@/components/common/CurlImportModal.vue'
 import PostmanImportModal from '@/components/common/PostmanImportModal.vue'
-import PostmanExportModal from '@/components/common/PostmanExportModal.vue'
+import ExportDialog from '@/components/common/ExportDialog.vue'
 import CodeGeneratorModal from '@/components/common/CodeGeneratorModal.vue'
 import OpenApiImportModal from '@/components/common/OpenApiImportModal.vue'
 import HarImportModal from '@/components/common/HarImportModal.vue'
 import SaveRequestModal from '@/components/common/SaveRequestModal.vue'
 import SettingsModal from '@/components/common/SettingsModal.vue'
 import EnvironmentManager from '@/components/environment/EnvironmentManager.vue'
-import type { RequestTab } from '@/types'
+import type { RequestTab, ImportedCollection } from '@/types'
 import { normalizeRequest, type RawRequest } from '@/types'
 
 const message = useMessage()
@@ -31,7 +31,8 @@ const { t } = useI18n()
 const collapsed = ref(false)
 const showCurlImport = ref(false)
 const showPostmanImport = ref(false)
-const showPostmanExport = ref(false)
+const showExportDialog = ref(false)
+const exportPreselectId = ref<string | undefined>()
 const showCodeGenerator = ref(false)
 const showOpenApiImport = ref(false)
 const showHarImport = ref(false)
@@ -154,16 +155,30 @@ function handleCurlImport(request: RawRequest) {
   message.success(t('import.importSuccess', { count: 1 }))
 }
 
-function handleRequestsImport(requests: RawRequest[], _source: string) {
-  if (requests.length > 0) {
-    const normalizedRequest = normalizeRequest(requests[0])
-    requestStore.openRequest(normalizedRequest, undefined, true)
-    message.success(t('import.importSuccess', { count: requests.length }))
+/** Postman 集合导入：按层级建集合/文件夹后逐个落库 */
+async function handleRequestsImport(payload: ImportedCollection | RawRequest[], source: string) {
+  try {
+    if (source === 'Postman') {
+      const collection = await requestStore.importCollectionTree(payload as ImportedCollection)
+      const first = collection.requests[0]
+      if (first) requestStore.openRequest(first, collection.id)
+      message.success(t('import.importSuccess', { count: collection.requests.length }))
+    } else {
+      const requests = payload as RawRequest[]
+      if (requests.length > 0) {
+        const normalizedRequest = normalizeRequest(requests[0])
+        requestStore.openRequest(normalizedRequest, undefined, true)
+        message.success(t('import.importSuccess', { count: requests.length }))
+      }
+    }
+  } catch (e) {
+    message.error(String(e))
   }
 }
 
-function handleExport() {
-  showPostmanExport.value = true
+function handleExport(collectionId?: string) {
+  exportPreselectId.value = collectionId
+  showExportDialog.value = true
 }
 
 function sendRequest() {
@@ -416,7 +431,8 @@ useShortcuts([
           @toggle="toggleSidebar"
           @new-request="newRequest"
           @import="handleImportSelect"
-          @export="handleExport"
+          @export="handleExport()"
+          @export-collection="(id: string) => handleExport(id)"
           @settings="showSettings = true"
         />
         <div
@@ -529,12 +545,13 @@ useShortcuts([
 
     <PostmanImportModal
       v-model:show="showPostmanImport"
-      @import="(reqs: any[]) => handleRequestsImport(reqs, 'Postman')"
+      @imported="(c: ImportedCollection) => handleRequestsImport(c, 'Postman')"
     />
 
-    <PostmanExportModal
-      v-model:show="showPostmanExport"
-      :requests="requestStore.collections.flatMap((c) => c.requests)"
+    <ExportDialog
+      v-model:show="showExportDialog"
+      :collections="requestStore.collections"
+      :preselected-collection-id="exportPreselectId"
     />
 
     <CodeGeneratorModal v-model:show="showCodeGenerator" :request="requestStore.currentRequest" />

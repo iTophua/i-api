@@ -10,8 +10,10 @@ import type {
   AuthConfig,
   Response,
   RequestTab,
+  ImportedCollection,
+  ImportedFolder,
 } from '@/types'
-import { safeParseDate } from '@/types'
+import { safeParseDate, normalizeRequest, type RawRequest } from '@/types'
 
 const createDefaultRequest = (): Request => ({
   id: crypto.randomUUID(),
@@ -471,6 +473,41 @@ export const useRequestStore = defineStore('request', () => {
     }
 
     return folder
+  }
+
+  /** 导入 Postman 集合：按层级建集合/文件夹并逐个落库，返回新建的集合 */
+  async function importCollectionTree(imported: ImportedCollection) {
+    const collection = await createCollection(imported.name || '导入的集合')
+
+    const saveRequestTo = async (raw: RawRequest, collectionId: string, folderId?: string) => {
+      const request = normalizeRequest(raw)
+      request.collectionId = collectionId
+      request.folderId = folderId
+      await invoke('save_request_to_collection', {
+        request,
+        collectionId,
+        folderId: folderId ?? null,
+      })
+      return request
+    }
+
+    const importFolders = async (folders: ImportedFolder[], parentFolderId?: string) => {
+      for (const f of folders) {
+        const folder = await createFolder(collection.id, f.name, parentFolderId)
+        if (!folder) continue
+        for (const r of f.requests) {
+          folder.requests.push(await saveRequestTo(r as RawRequest, collection.id, folder.id))
+        }
+        await importFolders(f.folders, folder.id)
+      }
+    }
+
+    await importFolders(imported.folders)
+    for (const r of imported.requests) {
+      collection.requests.push(await saveRequestTo(r as RawRequest, collection.id))
+    }
+
+    return collection
   }
 
   async function deleteFolder(collectionId: string, folderId: string) {
@@ -1062,6 +1099,7 @@ export const useRequestStore = defineStore('request', () => {
     createCollection,
     renameCollection,
     createFolder,
+    importCollectionTree,
     deleteFolder,
     renameFolder,
     deleteRequest,

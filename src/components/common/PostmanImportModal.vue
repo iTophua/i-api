@@ -2,7 +2,7 @@
 import { NModal, NCard, NUpload, NButton, NSpace, NAlert } from 'naive-ui'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { Request } from '@/types'
+import type { ImportedCollection } from '@/types'
 
 const props = defineProps<{
   show: boolean
@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [show: boolean]
-  imported: [requests: Request[]]
+  imported: [collection: ImportedCollection]
 }>()
 
 const error = ref('')
@@ -25,10 +25,10 @@ async function handleFileSelect(options: { file: { file: File | null } }) {
 
   try {
     const text = await file.text()
-    const requests = await invoke<Request[]>('import_postman_collection', {
+    const collection = await invoke<ImportedCollection>('import_postman_collection', {
       json: text,
     })
-    emit('imported', requests)
+    emit('imported', collection)
     handleClose()
   } catch (e) {
     error.value = String(e)

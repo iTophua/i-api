@@ -127,6 +127,21 @@ export interface Collection {
   updatedAt: string
 }
 
+/** Postman 集合导入结果：保持文件夹层级 */
+export interface ImportedFolder {
+  name: string
+  description?: string
+  folders: ImportedFolder[]
+  requests: Request[]
+}
+
+export interface ImportedCollection {
+  name: string
+  description?: string
+  folders: ImportedFolder[]
+  requests: Request[]
+}
+
 export type Variable = KeyValuePair
 
 export interface Environment {

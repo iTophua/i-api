@@ -32,6 +32,7 @@ const emit = defineEmits<{
   'new-request': []
   import: [key: string]
   export: []
+  'export-collection': [collectionId: string]
   settings: []
 }>()
 
@@ -112,6 +113,7 @@ const {
 const collectionContextMenuOptions = computed(() => [
   { label: () => t('collection.newFolder'), key: 'new-folder' },
   { label: () => t('common.rename'), key: 'rename' },
+  { label: () => t('collection.exportCollection'), key: 'export' },
   { label: () => t('common.delete'), key: 'delete' },
 ])
 
@@ -157,6 +159,8 @@ function handleContextMenuSelect(key: string) {
       if (collection) {
         startRename(collection.id, collection.name, 'collection')
       }
+    } else if (key === 'export') {
+      emit('export-collection', contextMenuTarget.value.id)
     } else if (key === 'delete') {
       requestStore.deleteCollection(contextMenuTarget.value.id)
     }
